@@ -22,6 +22,10 @@ const apiRoutes  = require('./routes/api');
 const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3000;
+const isProd = process.env.NODE_ENV === 'production';
+
+// Render utilise un reverse-proxy → nécessaire pour les cookies secure
+if (isProd) app.set('trust proxy', 1);
 
 /* ---- Protection globale contre les crashs async ---- */
 process.on('unhandledRejection', (err) => {
@@ -64,7 +68,15 @@ app.use(helmet({
     contentSecurityPolicy: false,  // Désactivé pour le dev (fonts Google, CDN)
     crossOriginEmbedderPolicy: false,
 }));
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true }));
+const allowedOrigins = [process.env.CLIENT_URL, 'http://localhost:3000'].filter(Boolean);
+app.use(cors({
+    origin: (origin, cb) => {
+        // Autoriser les requêtes sans origin (curl, socket.io, etc.)
+        if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+        cb(null, false);
+    },
+    credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -81,7 +93,7 @@ async function setupSession() {
         cookie: {
             maxAge: 7 * 24 * 60 * 60 * 1000,
             httpOnly: true,
-            secure: false,  // true en prod avec HTTPS
+            secure: isProd,      // true en prod (HTTPS via Render)
             sameSite: 'lax',
         },
     };
@@ -178,7 +190,13 @@ async function setupSession() {
    ============================================================ */
 const { Server } = require('socket.io');
 const io = new Server(server, {
-    cors: { origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true },
+    cors: {
+        origin: (origin, cb) => {
+            if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+            cb(null, false);
+        },
+        credentials: true,
+    },
 });
 
 // Rendre io accessible aux routes si besoin
@@ -401,7 +419,7 @@ async function start() {
 
     // 4) Lancer le serveur HTTP
     server.listen(PORT, () => {
-        console.log(`\n🚀 TTM Server démarré sur http://localhost:${PORT}\n`);
+        console.log(`\n🚀 TTM Server démarré sur ${isProd ? 'port' : 'http://localhost:'}${isProd ? ' ' + PORT : PORT}\n`);
     });
 }
 
