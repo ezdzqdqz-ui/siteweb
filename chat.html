@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTM — Chat</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar" id="navbar"></nav>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="chat-page" id="chatPage">
+        <!-- SIDEBAR -->
+        <aside class="chat-sidebar" id="chatSidebar">
+            <div class="chat-sidebar-header">
+                <h3><i class="fas fa-comment-dots"></i> Messages</h3>
+                <button class="btn btn-icon" id="toggleSidebar" title="Réduire"><i class="fas fa-bars"></i></button>
+            </div>
+            <div class="chat-search">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Rechercher..." id="chatSearch">
+            </div>
+            <div class="chat-contacts" id="chatContacts"></div>
+        </aside>
+
+        <!-- MAIN -->
+        <main class="chat-main" id="chatMain">
+            <!-- Empty state -->
+            <div class="chat-empty" id="chatEmpty">
+                <div class="chat-empty-icon"><i class="fas fa-comment-dots"></i></div>
+                <h3>Tes messages</h3>
+                <p>Sélectionne une conversation ou envoie une invitation pour commencer à chatter.</p>
+            </div>
+            <!-- Active convo -->
+            <div class="chat-active" id="chatActive" style="display:none">
+                <div class="chat-topbar">
+                    <button class="btn btn-icon chat-back" id="chatBack"><i class="fas fa-arrow-left"></i></button>
+                    <img src="" alt="" class="chat-topbar-avatar" id="chatTopAvatar">
+                    <div class="chat-topbar-info">
+                        <span class="chat-topbar-name" id="chatTopName"></span>
+                        <span class="chat-topbar-status" id="chatTopStatus"></span>
+                    </div>
+                    <div class="chat-topbar-actions">
+                        <a href="#" class="btn btn-icon" id="chatViewProfile" title="Voir profil"><i class="fas fa-user"></i></a>
+                        <button class="btn btn-icon" id="chatInvite" title="Inviter à jouer"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-typing" id="chatTyping" style="display:none">
+                    <div class="typing-dots"><span></span><span></span><span></span></div>
+                    <span>écrit...</span>
+                </div>
+                <div class="chat-input-wrap">
+                    <button class="btn btn-icon" id="chatEmoji" title="Emoji"><i class="fas fa-smile"></i></button>
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Ecris ton message..." autocomplete="off">
+                    <button class="btn btn-primary btn-icon" id="chatSend"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/auth-bridge.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!TTM.Auth.requireAuth()) return;
+        renderNavbar('chat');
+        let activeChat = null;
+
+        function renderContactList(filter) {
+            const contacts = TTM.getContacts();
+            const allChats = TTM.getChats();
+            const chatPartners = new Set([...contacts, ...Object.keys(allChats)]);
+            const list = [];
+
+            chatPartners.forEach(pid => {
+                const p = TTM.getPlayerById(pid);
+                if (!p) return;
+                const chat = allChats[pid] || [];
+                const last = chat.length ? chat[chat.length - 1] : null;
+                const unread = chat.filter(m => !m.read && !m.fromMe).length;
+                if (filter) {
+                    const q = filter.toLowerCase();
+                    if (!p.name.toLowerCase().includes(q)) return;
+                }
+                list.push({ pid, player: p, lastMsg: last, unread, lastTime: last ? new Date(last.timestamp).getTime() : 0 });
+            });
+
+            list.sort((a, b) => b.lastTime - a.lastTime);
+
+            const el = document.getElementById('chatContacts');
+            if (!list.length) {
+                el.innerHTML = `<div class="chat-no-contacts"><p>${filter ? 'Aucun résultat' : 'Aucune conversation'}</p><a href="index.html" class="btn btn-primary btn-sm">Découvrir des joueurs</a></div>`;
+                return;
+            }
+            el.innerHTML = list.map(c => {
+                const active = c.pid === activeChat ? ' active' : '';
+                const online = c.player.status === 'online';
+                let preview = '';
+                if (c.lastMsg) {
+                    const isMe = c.lastMsg.fromMe;
+                    let txt = c.lastMsg.text;
+                    if (txt.length > 50) txt = txt.slice(0, 50) + '...';
+                    preview = `<span class="contact-preview">${isMe ? 'Toi : ' : ''}${txt}</span>`;
+                }
+                return `
+                <div class="chat-contact${active}" data-pid="${c.pid}">
+                    <div class="contact-avatar-wrap">
+                        <img src="${c.player.avatar}" class="contact-avatar">
+                        ${online ? '<span class="contact-online"></span>' : ''}
+                    </div>
+                    <div class="contact-info">
+                        <span class="contact-name">${c.player.name}</span>
+                        ${preview}
+                    </div>
+                    <div class="contact-meta">
+                        ${c.lastMsg ? `<span class="contact-time">${TTM.timeAgo(c.lastMsg.timestamp)}</span>` : ''}
+                        ${c.unread ? `<span class="contact-badge">${c.unread}</span>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+
+            el.querySelectorAll('.chat-contact').forEach(el => {
+                el.addEventListener('click', () => openChat(el.dataset.pid));
+            });
+        }
+
+        function openChat(pid) {
+            const player = TTM.getPlayerById(pid);
+            if (!player) return;
+            activeChat = pid;
+            TTM.markAsRead(pid);
+
+            document.getElementById('chatEmpty').style.display = 'none';
+            document.getElementById('chatActive').style.display = 'flex';
+            document.getElementById('chatTopAvatar').src = player.avatar;
+            document.getElementById('chatTopName').textContent = player.name;
+            const statusTxt = player.status === 'online' ? 'En ligne' : player.status === 'idle' ? 'Absent' : 'Hors ligne';
+            document.getElementById('chatTopStatus').textContent = statusTxt;
+            document.getElementById('chatTopStatus').className = 'chat-topbar-status ' + player.status;
+            document.getElementById('chatViewProfile').href = `player.html?id=${pid}`;
+
+            renderMessages();
+            renderContactList(document.getElementById('chatSearch').value);
+            document.getElementById('chatInput').focus();
+
+            // On mobile, show main
+            document.getElementById('chatPage').classList.add('chat-open');
+        }
+
+        function renderMessages() {
+            if (!activeChat) return;
+            const chat = TTM.getChatWith(activeChat);
+            const player = TTM.getPlayerById(activeChat);
+            const profile = TTM.getProfile();
+            const myAvatar = profile.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=me&backgroundColor=6c5ce7`;
+
+            const el = document.getElementById('chatMessages');
+            if (!chat.length) {
+                el.innerHTML = `<div class="chat-start-msg"><p>Début de la conversation avec <strong>${player.name}</strong></p></div>`;
+                return;
+            }
+
+            let html = '';
+            let lastDate = '';
+            chat.forEach(m => {
+                const d = new Date(m.timestamp);
+                const dateStr = d.toLocaleDateString('fr-FR', {day:'numeric', month:'long', year:'numeric'});
+                if (dateStr !== lastDate) {
+                    html += `<div class="chat-date-sep"><span>${dateStr}</span></div>`;
+                    lastDate = dateStr;
+                }
+                const isMe = m.fromMe;
+                const avatar = isMe ? myAvatar : player.avatar;
+                const name = isMe ? 'Toi' : player.name;
+                const time = d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+
+                const isInvite = m.text.startsWith('[Invitation');
+                let msgContent = m.text;
+                if (isInvite) {
+                    const match = m.text.match(/\[Invitation a jouer — (.+?)\]\s*(.*)/s);
+                    if (match) {
+                        msgContent = `<div class="msg-invite"><div class="msg-invite-header"><i class="fas fa-gamepad"></i> Invitation — ${match[1]}</div><div class="msg-invite-body">${match[2]}</div></div>`;
+                    }
+                }
+
+                html += `
+                <div class="message ${isMe ? 'me' : 'them'}">
+                    <img src="${avatar}" class="message-avatar" alt="">
+                    <div class="message-content">
+                        <div class="message-header"><span class="message-name">${name}</span><span class="message-time">${time}</span></div>
+                        <div class="message-bubble">${msgContent}</div>
+                    </div>
+                </div>`;
+            });
+            el.innerHTML = html;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function sendMsg() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text || !activeChat) return;
+            TTM.sendMessage(activeChat, text);
+            input.value = '';
+            renderMessages();
+            renderContactList(document.getElementById('chatSearch').value);
+        }
+
+        // Events
+        document.getElementById('chatInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
+        document.getElementById('chatSend').addEventListener('click', sendMsg);
+        document.getElementById('chatBack').addEventListener('click', () => {
+            document.getElementById('chatPage').classList.remove('chat-open');
+            activeChat = null;
+            document.getElementById('chatActive').style.display = 'none';
+            document.getElementById('chatEmpty').style.display = 'flex';
+        });
+        document.getElementById('chatSearch').addEventListener('input', e => renderContactList(e.target.value));
+        document.getElementById('chatInvite').addEventListener('click', () => {
+            if (activeChat) {
+                const msg = prompt('Message d\'invitation :');
+                if (msg) {
+                    const p = TTM.getPlayerById(activeChat);
+                    const game = p?.games[0]?.name || 'un jeu';
+                    TTM.sendInvite(activeChat, msg, game);
+                    renderMessages();
+                    renderContactList(document.getElementById('chatSearch').value);
+                }
+            }
+        });
+
+        // Simulated reply handling
+        window.addEventListener('ttm-typing', e => {
+            if (e.detail.playerId === activeChat) {
+                const el = document.getElementById('chatMessages');
+                const existing = el.querySelector('.typing-indicator');
+                if (!existing) {
+                    const div = document.createElement('div');
+                    div.className = 'typing-indicator';
+                    div.innerHTML = `<div class="typing-dots"><span></span><span></span><span></span></div> ${e.detail.name} écrit...`;
+                    el.appendChild(div);
+                    el.scrollTop = el.scrollHeight;
+                }
+            }
+        });
+
+        window.addEventListener('ttm-new-message', e => {
+            const typing = document.querySelector('.typing-indicator');
+            if (typing) typing.remove();
+            renderMessages();
+            renderContactList(document.getElementById('chatSearch').value);
+            updateMsgBadge();
+        });
+
+        // Open specific chat
+        const params = new URLSearchParams(location.search);
+        const openId = params.get('open');
+
+        // Initial render
+        renderContactList('');
+        if (openId) {
+            const p = TTM.getPlayerById(openId);
+            if (p) {
+                if (!TTM.isContact(openId)) TTM.addContact(openId);
+                openChat(openId);
+            }
+        }
+    });
+    </script>
+</body>
+</html>

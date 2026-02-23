@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTM — Looking For Group</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar" id="navbar"></nav>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <section class="lfg-page">
+        <!-- HEADER -->
+        <div class="lfg-header">
+            <h1><i class="fas fa-users"></i> Looking For Group</h1>
+            <button class="btn btn-primary btn-lg" id="startMatchmaking">
+                <i class="fas fa-bolt"></i> Chercher un mate
+            </button>
+        </div>
+
+        <!-- FILTERS -->
+        <div class="lfg-filters">
+            <div class="lfg-filters-title"><i class="fas fa-filter"></i> Filtrer par tags</div>
+            <div class="lfg-filter-cats" id="lfgFilterCats"></div>
+            <div class="lfg-active-tags" id="lfgActiveTags" style="display:none"></div>
+        </div>
+
+        <!-- RESULTS -->
+        <div class="lfg-results-header">
+            <span class="lfg-results-count" id="lfgResultsCount"></span>
+            <button class="btn btn-sm btn-ghost" id="clearFilters"><i class="fas fa-times"></i> Effacer les filtres</button>
+        </div>
+        <div class="players-grid" id="lfgPlayersGrid"></div>
+    </section>
+
+    <!-- MATCHMAKING OVERLAY (hidden by default) -->
+    <div class="mm-overlay" id="mmOverlay" style="display:none"></div>
+
+    <!-- INVITE MODAL -->
+    <div class="modal-overlay" id="inviteModal" style="display:none">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-paper-plane"></i> Inviter à jouer</h3>
+                <button class="modal-close" id="inviteClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="invite-preview" id="invitePreview"></div>
+                <div class="form-group">
+                    <label>Jeu</label>
+                    <select class="form-input" id="inviteGame"></select>
+                </div>
+                <div class="form-group">
+                    <label>Message perso</label>
+                    <textarea class="form-input" id="inviteMsg" rows="3" placeholder="Hey ! Ça te dit une game ?"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="inviteCancel">Annuler</button>
+                <button class="btn btn-primary" id="inviteSend"><i class="fas fa-paper-plane"></i> Envoyer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/auth-bridge.js"></script>
+    <script src="js/app.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!TTM.Auth.requireAuth()) return;
+        renderNavbar('lfg');
+
+        // ================================================================
+        //  1. Build filter UI from tag categories
+        // ================================================================
+        const filterCats = document.getElementById('lfgFilterCats');
+        const activeTagsDiv = document.getElementById('lfgActiveTags');
+        const selectedTags = {}; // { catId: Set }
+
+        TTM.tagCategories.forEach(cat => {
+            selectedTags[cat.id] = new Set();
+            const row = document.createElement('div');
+            row.className = 'lfg-filter-row';
+            row.innerHTML = `
+                <span class="lfg-filter-label"><i class="${cat.icon}" style="color:${cat.color};margin-right:6px"></i>${cat.label}</span>
+                <div class="tag-buttons" data-cat="${cat.id}">
+                    ${cat.tags.map(t =>
+                        `<button class="tag-btn" data-cat="${cat.id}" data-tag="${t}" style="--tag-color:${cat.color}">#${t}</button>`
+                    ).join('')}
+                </div>
+            `;
+            filterCats.appendChild(row);
+        });
+
+        // Filter click handler
+        filterCats.addEventListener('click', e => {
+            const btn = e.target.closest('.tag-btn');
+            if (!btn) return;
+            const cat = btn.dataset.cat;
+            const tag = btn.dataset.tag;
+            if (btn.classList.contains('active')) {
+                btn.classList.remove('active');
+                selectedTags[cat].delete(tag);
+            } else {
+                btn.classList.add('active');
+                selectedTags[cat].add(tag);
+            }
+            updateActiveTags();
+            renderLFGPlayers();
+        });
+
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            filterCats.querySelectorAll('.tag-btn.active').forEach(b => b.classList.remove('active'));
+            Object.values(selectedTags).forEach(s => s.clear());
+            updateActiveTags();
+            renderLFGPlayers();
+        });
+
+        function getSelectedTagsFlat() {
+            const flat = [];
+            for (const cat of Object.keys(selectedTags)) {
+                for (const tag of selectedTags[cat]) flat.push(tag);
+            }
+            return flat;
+        }
+
+        function updateActiveTags() {
+            const flat = getSelectedTagsFlat();
+            if (!flat.length) {
+                activeTagsDiv.style.display = 'none';
+                return;
+            }
+            activeTagsDiv.style.display = 'flex';
+            activeTagsDiv.innerHTML = flat.map(t =>
+                `<span class="lfg-active-tag">#${t} <i class="fas fa-times remove-tag" data-tag="${t}"></i></span>`
+            ).join('');
+            activeTagsDiv.querySelectorAll('.remove-tag').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tag = btn.dataset.tag;
+                    // Find and deactivate the tag button
+                    for (const cat of Object.keys(selectedTags)) {
+                        if (selectedTags[cat].has(tag)) {
+                            selectedTags[cat].delete(tag);
+                            const tagBtn = filterCats.querySelector(`.tag-btn[data-cat="${cat}"][data-tag="${tag}"]`);
+                            if (tagBtn) tagBtn.classList.remove('active');
+                        }
+                    }
+                    updateActiveTags();
+                    renderLFGPlayers();
+                });
+            });
+        }
+
+        // ================================================================
+        //  2. Render filtered players
+        // ================================================================
+        function renderLFGPlayers() {
+            const grid = document.getElementById('lfgPlayersGrid');
+            const countEl = document.getElementById('lfgResultsCount');
+            let players = TTM.getAllPlayers();
+            const activeTags = getSelectedTagsFlat();
+
+            // Filter by selected tags
+            if (activeTags.length) {
+                players = players.filter(p => {
+                    const pTags = TTM.flattenTags(p.tags || {});
+                    return activeTags.every(t => pTags.includes(t));
+                });
+            }
+
+            countEl.textContent = `${players.length} joueur${players.length !== 1 ? 's' : ''} trouvé${players.length !== 1 ? 's' : ''}`;
+
+            if (!players.length) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-ghost" style="font-size:32px;color:var(--text-muted);margin-bottom:12px"></i>
+                        <p>Aucun joueur ne correspond à ces critères</p>
+                        <span style="color:var(--text-muted);font-size:13px">Essaie d'enlever des filtres ou lance le matchmaking !</span>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = players.map(p => {
+                const gTags = p.games.slice(0, 3).map(g => {
+                    const gi = TTM.getGameById(g.id);
+                    const logoTag = gi && gi.logo ? `<img src="${gi.logo}" style="width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:4px">` : '';
+                    return `<span class="player-game-tag ${g.id}">${logoTag}${g.name}</span>`;
+                }).join('') || '<span style="color:var(--text-muted);font-size:12px">Aucun jeu</span>';
+
+                const pTags = TTM.flattenTags(p.tags || {});
+                const tagsHTML = pTags.slice(0, 5).map(t => {
+                    const catInfo = TTM.tagCategories.find(c => c.tags.includes(t));
+                    const catId = catInfo ? catInfo.id : '';
+                    return `<span class="profile-tag cat-${catId}">#${t}</span>`;
+                }).join('');
+
+                const mg = p.games[0];
+                const dot = p.status === 'online' ? '#00d68f' : p.status === 'idle' ? '#ffaa00' : '#6a6a80';
+
+                return `
+                <div class="player-card" data-id="${p.id}">
+                    <div class="player-card-header">
+                        <div style="position:relative">
+                            <img src="${p.avatar}" alt="${p.name}" style="width:48px;height:48px;border-radius:10px">
+                            <div class="player-card-status ${p.status}" style="background:${dot}"></div>
+                        </div>
+                        <div class="player-card-info">
+                            <div class="player-card-name">${p.name}</div>
+                            <div class="player-card-tagline">${p.tagline || 'Nouveau joueur'}</div>
+                        </div>
+                    </div>
+                    <div class="player-card-games">${gTags}</div>
+                    ${tagsHTML ? `<div class="profile-tags" style="margin-bottom:12px">${tagsHTML}</div>` : ''}
+                    ${mg ? `<div class="player-card-meta">
+                        <span class="player-card-rank" style="color:${mg.rankColor}"><i class="${mg.rankIcon}"></i> ${mg.rank}</span>
+                        <span class="player-card-style">${p.playstyle === 'competitive' ? 'Compétitif' : 'Casual'}</span>
+                    </div>` : ''}
+                    <div class="player-card-actions">
+                        <a href="player.html?id=${p.id}" class="btn btn-sm btn-secondary"><i class="fas fa-eye"></i> Profil</a>
+                        <button class="btn btn-sm btn-primary invite-btn" data-player="${p.id}"><i class="fas fa-paper-plane"></i> Inviter</button>
+                    </div>
+                    ${getLevelBadge(p.stats.level)}
+                </div>`;
+            }).join('');
+
+            // Animate cards
+            grid.querySelectorAll('.player-card').forEach((el, i) => {
+                el.style.opacity = '0'; el.style.transform = 'translateY(20px)';
+                setTimeout(() => { el.style.transition = 'all .4s ease'; el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }, i * 50);
+            });
+            grid.querySelectorAll('.invite-btn').forEach(b => {
+                b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openInviteModal(b.dataset.player); });
+            });
+        }
+
+        renderLFGPlayers();
+
+        // ================================================================
+        //  3. Invite Modal (reused)
+        // ================================================================
+        function initInviteModal() {
+            const m = document.getElementById('inviteModal');
+            document.getElementById('inviteClose')?.addEventListener('click', () => m.style.display = 'none');
+            document.getElementById('inviteCancel')?.addEventListener('click', () => m.style.display = 'none');
+            m?.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
+            document.getElementById('inviteSend')?.addEventListener('click', () => {
+                const pid = m.dataset.pid;
+                const game = document.getElementById('inviteGame').value;
+                const msg = document.getElementById('inviteMsg').value.trim();
+                if (!msg) { showToast('Écris un message !', 'warning'); return; }
+                TTM.sendInvite(pid, msg, game);
+                m.style.display = 'none';
+                showToast('Invitation envoyée !', 'success');
+                document.getElementById('inviteMsg').value = '';
+            });
+        }
+        function openInviteModal(pid) {
+            if (!TTM.isProfileSetup()) { showToast('Configure ton profil d\'abord !', 'warning'); return; }
+            const p = TTM.getPlayerById(pid); if (!p) return;
+            const m = document.getElementById('inviteModal'); m.dataset.pid = pid;
+            document.getElementById('invitePreview').innerHTML = `<img src="${p.avatar}" style="width:40px;height:40px;border-radius:10px"><div><strong>${p.name}</strong><br><span style="color:var(--text-muted);font-size:13px">${p.tagline || 'Joueur'}</span></div>`;
+            document.getElementById('inviteGame').innerHTML = p.games.length
+                ? p.games.map(g => `<option value="${g.name}">${g.name}</option>`).join('')
+                : TTM.gamesList.map(g => `<option value="${g.name}">${g.name}</option>`).join('');
+            document.getElementById('inviteMsg').value = '';
+            m.style.display = 'flex';
+        }
+        initInviteModal();
+
+        // ================================================================
+        //  4. MATCHMAKING — WebSocket based (with localStorage fallback)
+        // ================================================================
+        let socket = null;
+        let mmInterval = null;
+        let mmStartTime = 0;
+        let mmRoomId = null;
+        const overlay = document.getElementById('mmOverlay');
+
+        function connectSocket() {
+            if (socket && socket.connected) return;
+            try {
+                socket = io({ transports: ['websocket', 'polling'] });
+
+                socket.on('connect', () => {
+                    console.log('🟢 Socket connected:', socket.id);
+                });
+
+                socket.on('mm:waiting', (data) => {
+                    updateMMStatus(`Recherche en cours... (${data.queueSize} en file)`);
+                });
+
+                socket.on('mm:broadened', () => {
+                    updateMMStatus('Aucun match exact — Recherche élargie...');
+                });
+
+                socket.on('mm:matched', (data) => {
+                    mmRoomId = data.roomId;
+                    showMatchFound(data);
+                });
+
+                socket.on('mm:chat-message', (data) => {
+                    appendChatMessage(data.username, data.text, false);
+                });
+
+                socket.on('mm:partner-left', () => {
+                    showToast('Ton mate a quitté le chat', 'warning');
+                    closeMatchmaking();
+                });
+
+                socket.on('mm:cancelled', () => {
+                    // Server confirmed cancellation
+                });
+
+                socket.on('disconnect', () => {
+                    console.log('🔴 Socket disconnected');
+                });
+            } catch (e) {
+                console.warn('Socket.io non disponible, matchmaking local uniquement');
+            }
+        }
+
+        // Start matchmaking
+        document.getElementById('startMatchmaking').addEventListener('click', () => {
+            if (!TTM.isProfileSetup()) {
+                showToast('Configure ton profil d\'abord !', 'warning');
+                return;
+            }
+
+            const profile = TTM.getProfile();
+            const myTags = TTM.flattenTags(profile.tags || {});
+            if (!myTags.length) {
+                showToast('Ajoute des tags dans Réglages > Tags avant de chercher un mate', 'warning');
+                return;
+            }
+
+            // Merge with active filter tags
+            const filterTags = getSelectedTagsFlat();
+            const searchTags = filterTags.length ? filterTags : myTags;
+
+            showSearchingUI(searchTags);
+
+            // Try WebSocket matchmaking
+            connectSocket();
+            if (socket && socket.connected) {
+                socket.emit('mm:join', {
+                    tags: searchTags,
+                    username: profile.username,
+                    avatar: profile.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(profile.username)}&backgroundColor=6c5ce7`,
+                    discord: profile.discord || profile.username,
+                    tagline: profile.tagline || '',
+                });
+            } else {
+                // Fallback: local "fake" matchmaking after a delay
+                startLocalFallbackMatchmaking(searchTags);
+            }
+        });
+
+        function showSearchingUI(tags) {
+            mmStartTime = Date.now();
+            overlay.style.display = 'flex';
+            overlay.innerHTML = `
+                <div class="mm-card" id="mmCard">
+                    <div class="mm-spinner"></div>
+                    <h2>Recherche d'un mate...</h2>
+                    <div class="mm-timer" id="mmTimerDisplay">0:00</div>
+                    <div class="mm-status" id="mmStatusText">Recherche de joueurs avec les mêmes critères...</div>
+                    <div class="mm-tags-preview">
+                        ${tags.map(t => {
+                            const cat = TTM.tagCategories.find(c => c.tags.includes(t));
+                            const catId = cat ? cat.id : '';
+                            return `<span class="profile-tag cat-${catId}">#${t}</span>`;
+                        }).join('')}
+                    </div>
+                    <button class="btn btn-ghost mm-cancel" id="mmCancelBtn"><i class="fas fa-times"></i> Annuler</button>
+                </div>
+            `;
+            document.getElementById('mmCancelBtn').addEventListener('click', cancelMatchmaking);
+
+            mmInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - mmStartTime) / 1000);
+                const min = Math.floor(elapsed / 60);
+                const sec = elapsed % 60;
+                const display = document.getElementById('mmTimerDisplay');
+                if (display) display.textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function updateMMStatus(text) {
+            const el = document.getElementById('mmStatusText');
+            if (el) el.textContent = text;
+        }
+
+        function cancelMatchmaking() {
+            if (socket && socket.connected) {
+                socket.emit('mm:cancel');
+            }
+            closeMatchmaking();
+        }
+
+        function closeMatchmaking() {
+            overlay.style.display = 'none';
+            overlay.innerHTML = '';
+            if (mmInterval) { clearInterval(mmInterval); mmInterval = null; }
+            mmRoomId = null;
+        }
+
+        function showMatchFound(data) {
+            if (mmInterval) { clearInterval(mmInterval); mmInterval = null; }
+
+            const card = document.getElementById('mmCard');
+            if (!card) return;
+
+            card.classList.add('mm-found');
+            card.innerHTML = `
+                <h2 style="color:var(--green)"><i class="fas fa-check-circle"></i> Match trouvé !</h2>
+                <p>Vous avez des critères compatibles</p>
+                <div class="mm-match-info">
+                    <div>
+                        <img src="${data.partner.avatar}" class="mm-match-avatar">
+                        <div class="mm-match-name">${data.partner.username}</div>
+                        <div class="mm-match-tagline">${data.partner.tagline || ''}</div>
+                    </div>
+                </div>
+                <div class="mm-tags-preview">
+                    ${(data.matchedTags || []).map(t => {
+                        const cat = TTM.tagCategories.find(c => c.tags.includes(t));
+                        const catId = cat ? cat.id : '';
+                        return `<span class="profile-tag cat-${catId}">#${t}</span>`;
+                    }).join('')}
+                </div>
+                <button class="btn-copy-discord" id="copyDiscordBtn">
+                    <i class="fab fa-discord"></i> Copier le pseudo Discord : ${data.partner.discord || data.partner.username}
+                </button>
+                <div class="mm-chat">
+                    <div class="mm-chat-messages" id="mmChatMessages">
+                        <div style="text-align:center;color:var(--text-muted);font-size:12px;padding:8px">Début du chat — dites bonjour !</div>
+                    </div>
+                    <div class="mm-chat-input-wrap">
+                        <input class="mm-chat-input" id="mmChatInput" placeholder="Écris un message..." autocomplete="off">
+                        <button class="btn btn-sm btn-primary" id="mmChatSend"><i class="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+                <button class="btn btn-ghost mm-cancel" id="mmCloseBtn" style="margin-top:16px"><i class="fas fa-times"></i> Fermer</button>
+            `;
+
+            // Copy Discord
+            document.getElementById('copyDiscordBtn').addEventListener('click', () => {
+                const discord = data.partner.discord || data.partner.username;
+                navigator.clipboard.writeText(discord).then(() => {
+                    showToast('Pseudo Discord copié !', 'success');
+                }).catch(() => {
+                    showToast(discord, 'info');
+                });
+            });
+
+            // Chat
+            const chatSend = () => {
+                const input = document.getElementById('mmChatInput');
+                const text = input.value.trim();
+                if (!text) return;
+                input.value = '';
+
+                if (socket && socket.connected && mmRoomId) {
+                    socket.emit('mm:chat-message', { roomId: mmRoomId, text });
+                }
+                appendChatMessage('Moi', text, true);
+            };
+            document.getElementById('mmChatSend').addEventListener('click', chatSend);
+            document.getElementById('mmChatInput').addEventListener('keydown', e => {
+                if (e.key === 'Enter') chatSend();
+            });
+
+            // Close
+            document.getElementById('mmCloseBtn').addEventListener('click', () => {
+                if (socket && socket.connected && mmRoomId) {
+                    socket.emit('mm:leave-room', { roomId: mmRoomId });
+                }
+                closeMatchmaking();
+            });
+        }
+
+        function appendChatMessage(author, text, isMe) {
+            const msgs = document.getElementById('mmChatMessages');
+            if (!msgs) return;
+            const div = document.createElement('div');
+            div.className = 'mm-chat-msg ' + (isMe ? 'me' : 'them');
+            div.innerHTML = `<span class="msg-author">${author}</span>${text}`;
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        // ================================================================
+        //  5. Local fallback matchmaking (no server)
+        // ================================================================
+        function startLocalFallbackMatchmaking(searchTags) {
+            // Simulate searching, then find a matching player from local pool
+            updateMMStatus('Recherche en cours...');
+
+            // After 3s, try exact match
+            setTimeout(() => {
+                const players = TTM.getAllPlayers();
+                let matches = players.filter(p => {
+                    const pTags = TTM.flattenTags(p.tags || {});
+                    return searchTags.every(t => pTags.includes(t));
+                });
+
+                if (matches.length) {
+                    const partner = matches[Math.floor(Math.random() * matches.length)];
+                    showMatchFound({
+                        roomId: 'local-' + Date.now(),
+                        partner: {
+                            username: partner.name,
+                            avatar: partner.avatar,
+                            discord: partner.discord || partner.name,
+                            tagline: partner.tagline,
+                        },
+                        matchedTags: searchTags,
+                    });
+                    return;
+                }
+
+                // Fallback after "30s" (simulated at 8s for better UX)
+                updateMMStatus('Aucun match exact — Élargissement de la recherche...');
+                setTimeout(() => {
+                    // Relax: remove style tags, keep jeu + niveau only
+                    const relaxedTags = searchTags.filter(t => {
+                        const cat = TTM.tagCategories.find(c => c.tags.includes(t));
+                        return cat && (cat.id === 'jeu' || cat.id === 'niveau');
+                    });
+
+                    let relaxedMatches = players.filter(p => {
+                        const pTags = TTM.flattenTags(p.tags || {});
+                        return relaxedTags.length ? relaxedTags.some(t => pTags.includes(t)) : true;
+                    });
+
+                    if (relaxedMatches.length) {
+                        const partner = relaxedMatches[Math.floor(Math.random() * relaxedMatches.length)];
+                        showMatchFound({
+                            roomId: 'local-' + Date.now(),
+                            partner: {
+                                username: partner.name,
+                                avatar: partner.avatar,
+                                discord: partner.discord || partner.name,
+                                tagline: partner.tagline,
+                            },
+                            matchedTags: relaxedTags.length ? relaxedTags : searchTags,
+                        });
+                    } else {
+                        updateMMStatus('Aucun joueur trouvé... Réessaie plus tard !');
+                        setTimeout(() => closeMatchmaking(), 3000);
+                    }
+                }, 5000);
+            }, 3000);
+        }
+
+        // Chat badge
+        updateMsgBadge();
+        window.addEventListener('ttm-new-message', updateMsgBadge);
+    });
+    </script>
+</body>
+</html>

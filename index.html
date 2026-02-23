@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTM — Trouve Ton Mate</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <!-- NAVBAR -->
+    <nav class="navbar" id="navbar"></nav>
+
+    <!-- SETUP PROMPT -->
+    <div class="container" style="padding-top:calc(var(--nav-h) + 20px)">
+        <div class="setup-prompt" id="setupPrompt" style="display:none">
+            <div class="setup-prompt-icon"><i class="fas fa-user-astronaut"></i></div>
+            <div class="setup-prompt-text">
+                <h3>Bienvenue sur TTM</h3>
+                <p>Configure ton profil pour commencer à trouver tes coéquipiers.</p>
+            </div>
+            <a href="settings.html" class="btn btn-primary"><i class="fas fa-cog"></i> Configurer</a>
+        </div>
+    </div>
+
+    <!-- HERO -->
+    <section class="hero" id="heroSection">
+        <div class="hero-content container">
+            <div class="hero-badge"><i class="fas fa-bolt"></i> Saison 1 — Ouvert</div>
+            <h1>Trouve ton<br><span class="accent">coéquipier idéal</span></h1>
+            <p>Connecte-toi avec des joueurs qui matchent ton style, ton niveau et tes ambitions.</p>
+            <div class="hero-actions">
+                <a href="settings.html" class="btn btn-primary btn-lg" id="heroCta">Créer mon profil <i class="fas fa-arrow-right"></i></a>
+                <a href="#discover" class="btn btn-ghost btn-lg">Explorer</a>
+            </div>
+            <div class="hero-stats">
+                <div class="hero-stat"><span class="stat-num" id="statPlayers" data-count="0">0</span><span class="stat-txt">Joueurs</span></div>
+                <div class="hero-stat"><span class="stat-num" id="statGames" data-count="0">0</span><span class="stat-txt">Jeux</span></div>
+                <div class="hero-stat"><span class="stat-num" id="statTeams" data-count="0">0</span><span class="stat-txt">Recherches</span></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- DISCOVER -->
+    <section class="discover-section" id="discover">
+        <div class="container">
+            <div class="section-header">
+                <h2><i class="fas fa-compass"></i> Découvrir des joueurs</h2>
+                <div class="filters">
+                    <select class="filter-select" id="filterGame"><option value="">Tous les jeux</option></select>
+                    <select class="filter-select" id="filterStyle">
+                        <option value="">Tous les styles</option>
+                        <option value="competitive">Compétitif</option>
+                        <option value="casual">Casual</option>
+                    </select>
+                    <select class="filter-select" id="filterLang">
+                        <option value="">Langues</option>
+                        <option value="Français">Français</option>
+                        <option value="English">English</option>
+                    </select>
+                </div>
+            </div>
+            <div class="players-grid" id="playersGrid"></div>
+        </div>
+    </section>
+
+    <!-- INVITE MODAL -->
+    <div class="modal-overlay" id="inviteModal" style="display:none">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-paper-plane"></i> Inviter à jouer</h3>
+                <button class="modal-close" id="inviteClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="invite-preview" id="invitePreview"></div>
+                <div class="form-group">
+                    <label>Jeu</label>
+                    <select class="form-input" id="inviteGame"></select>
+                </div>
+                <div class="form-group">
+                    <label>Message perso</label>
+                    <textarea class="form-input" id="inviteMsg" rows="3" placeholder="Hey ! Ca te dit une game ?"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="inviteCancel">Annuler</button>
+                <button class="btn btn-primary" id="inviteSend"><i class="fas fa-paper-plane"></i> Envoyer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="js/data.js"></script>
+    <script src="js/auth-bridge.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!TTM.Auth.requireAuth()) return;
+        renderNavbar('home');
+        if(!TTM.isProfileSetup()) document.getElementById('setupPrompt').style.display='flex';
+
+        // Hero counters — dynamic
+        const communityStats = TTM.getCommunityStats();
+        document.getElementById('statPlayers').dataset.count = communityStats.players;
+        document.getElementById('statGames').dataset.count = communityStats.games;
+        document.getElementById('statTeams').dataset.count = communityStats.teams;
+
+        const hObs = new IntersectionObserver(entries => {
+            entries.forEach(e => { if(e.isIntersecting) { document.querySelectorAll('[data-count]').forEach(el => animateCounter(el,+el.dataset.count)); hObs.unobserve(e.target); }});
+        },{threshold:0.3});
+        const hs = document.getElementById('heroSection');
+        if(hs) hObs.observe(hs);
+
+        // Populate game filter
+        const gf=document.getElementById('filterGame');
+        TTM.gamesList.forEach(g=>{ const o=document.createElement('option'); o.value=g.id; o.textContent=g.name; gf.appendChild(o); });
+
+        renderPlayers();
+        ['filterGame','filterStyle','filterLang'].forEach(id=>document.getElementById(id)?.addEventListener('change',renderPlayers));
+        initInviteModal();
+
+        // Update chat badge
+        updateMsgBadge();
+        window.addEventListener('ttm-new-message', updateMsgBadge);
+
+        // Scroll reveal
+        document.querySelectorAll('.section-header, .hero-stats').forEach(el => el.classList.add('reveal'));
+        initReveal();
+    });
+
+    function renderPlayers(){
+        const game=document.getElementById('filterGame').value;
+        const style=document.getElementById('filterStyle').value;
+        const lang=document.getElementById('filterLang').value;
+        let players=TTM.filterPlayers({game,style,lang});
+        const grid=document.getElementById('playersGrid');
+        if(!grid)return;
+        if(!players.length){ grid.innerHTML='<div class="empty-state"><i class="fas fa-ghost"></i><p>Aucun joueur trouvé</p><span style="color:var(--text-muted);font-size:13px">Invite tes potes à s\'inscrire pour les retrouver ici !</span></div>'; return; }
+
+        grid.innerHTML=players.map(p=>{
+            const gTags=p.games.slice(0,3).map(g=>{
+                const gi=TTM.getGameById(g.id);
+                const logoTag = gi && gi.logo ? `<img src="${gi.logo}" style="width:14px;height:14px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:4px">` : '';
+                return `<span class="player-game-tag ${g.id}">${logoTag}${g.name}</span>`;
+            }).join('') || '<span style="color:var(--text-muted);font-size:12px">Aucun jeu</span>';
+            const mg=p.games[0];
+            const dot=p.status==='online'?'#00d68f':p.status==='idle'?'#ffaa00':'#6a6a80';
+            return `
+            <div class="player-card" data-id="${p.id}">
+                <div class="player-card-header">
+                    <div style="position:relative">
+                        <img src="${p.avatar}" alt="${p.name}" style="width:48px;height:48px;border-radius:10px">
+                        <div class="player-card-status ${p.status}" style="background:${dot}"></div>
+                    </div>
+                    <div class="player-card-info">
+                        <div class="player-card-name">${p.name}</div>
+                        <div class="player-card-tagline">${p.tagline || 'Nouveau joueur'}</div>
+                    </div>
+                </div>
+                <div class="player-card-games">${gTags}</div>
+                ${mg ? `<div class="player-card-meta">
+                    <span class="player-card-rank" style="color:${mg.rankColor}"><i class="${mg.rankIcon}"></i> ${mg.rank}</span>
+                    <span class="player-card-style">${p.playstyle==='competitive'?'Compétitif':'Casual'}</span>
+                </div>` : ''}
+                <div class="player-card-actions">
+                    <a href="player.html?id=${p.id}" class="btn btn-sm btn-secondary"><i class="fas fa-eye"></i> Profil</a>
+                    <button class="btn btn-sm btn-primary invite-btn" data-player="${p.id}"><i class="fas fa-paper-plane"></i> Inviter</button>
+                </div>
+                ${getLevelBadge(p.stats.level)}
+            </div>`;
+        }).join('');
+
+        grid.querySelectorAll('.player-card').forEach((el,i)=>{
+            el.style.opacity='0';el.style.transform='translateY(20px)';
+            setTimeout(()=>{el.style.transition='all .4s ease';el.style.opacity='1';el.style.transform='translateY(0)';},i*50);
+        });
+        grid.querySelectorAll('.invite-btn').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openInviteModal(b.dataset.player);}));
+    }
+
+    function initInviteModal(){
+        const m=document.getElementById('inviteModal');
+        document.getElementById('inviteClose')?.addEventListener('click',()=>m.style.display='none');
+        document.getElementById('inviteCancel')?.addEventListener('click',()=>m.style.display='none');
+        m?.addEventListener('click',e=>{if(e.target===m)m.style.display='none';});
+        document.getElementById('inviteSend')?.addEventListener('click',()=>{
+            const pid=m.dataset.pid;
+            const game=document.getElementById('inviteGame').value;
+            const msg=document.getElementById('inviteMsg').value.trim();
+            if(!msg){showToast('Ecris un message !','warning');return;}
+            if(!TTM.isProfileSetup()){showToast('Configure ton profil d\'abord','warning');return;}
+            TTM.sendInvite(pid,msg,game);
+            m.style.display='none';
+            showToast('Invitation envoyée ! Regarde tes messages.','success');
+            document.getElementById('inviteMsg').value='';
+        });
+    }
+
+    function openInviteModal(pid){
+        if(!TTM.isProfileSetup()){showToast('Configure ton profil d\'abord !','warning');setTimeout(()=>location.href='settings.html',1200);return;}
+        const p=TTM.getPlayerById(pid); if(!p)return;
+        const m=document.getElementById('inviteModal'); m.dataset.pid=pid;
+        document.getElementById('invitePreview').innerHTML=`<img src="${p.avatar}" style="width:40px;height:40px;border-radius:10px"><div><strong>${p.name}</strong><br><span style="color:var(--text-muted);font-size:13px">${p.tagline||'Joueur'}</span></div>`;
+        document.getElementById('inviteGame').innerHTML= p.games.length ? p.games.map(g=>`<option value="${g.name}">${g.name}</option>`).join('') : TTM.gamesList.map(g=>`<option value="${g.name}">${g.name}</option>`).join('');
+        document.getElementById('inviteMsg').value='';
+        m.style.display='flex';
+        setTimeout(()=>document.getElementById('inviteMsg').focus(),200);
+    }
+    </script>
+</body>
+</html>

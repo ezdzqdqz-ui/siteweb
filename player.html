@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTM — Joueur</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar" id="navbar"></nav>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- INVITE MODAL -->
+    <div class="modal-overlay" id="inviteModal" style="display:none">
+        <div class="modal">
+            <div class="modal-header">
+                <h3><i class="fas fa-paper-plane"></i> Inviter à jouer</h3>
+                <button class="modal-close" id="inviteClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="invite-preview" id="invitePreview"></div>
+                <div class="form-group">
+                    <label>Jeu</label>
+                    <select class="form-input" id="inviteGame"></select>
+                </div>
+                <div class="form-group">
+                    <label>Message perso</label>
+                    <textarea class="form-input" id="inviteMsg" rows="3" placeholder="Salut ! Ca te dit de jouer ensemble ?"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" id="inviteCancel">Annuler</button>
+                <button class="btn btn-primary" id="inviteSend"><i class="fas fa-paper-plane"></i> Envoyer</button>
+            </div>
+        </div>
+    </div>
+
+    <section class="profile-section" id="playerContent" style="display:none">
+        <div class="container">
+            <div class="profile-card">
+                <div class="profile-banner" id="playerBanner">
+                    <div class="profile-banner-overlay"></div>
+                </div>
+                <div class="profile-header">
+                    <div class="profile-avatar-wrap">
+                        <img src="" alt="" class="profile-avatar" id="playerAvatar">
+                        <span class="profile-status" id="playerStatus"></span>
+                    </div>
+                    <div class="profile-info">
+                        <div class="profile-name-row">
+                            <h2 class="profile-name" id="playerName"></h2>
+                        </div>
+                        <p class="profile-tagline" id="playerTagline"></p>
+                        <div class="profile-meta" id="playerMeta"></div>
+                    </div>
+                    <div class="profile-actions" id="playerActions"></div>
+                </div>
+            </div>
+
+            <div class="profile-grid">
+                <div class="profile-left">
+                    <div class="card">
+                        <div class="card-header"><h3><i class="fas fa-chart-bar"></i> Stats</h3></div>
+                        <div class="stats-grid" id="playerStats"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3><i class="fas fa-user"></i> A propos</h3></div>
+                        <div class="about-content" id="playerAbout"></div>
+                        <div class="about-details" id="playerDetails"></div>
+                    </div>
+                    <div class="card card-discord" id="playerDiscordCard" style="display:none">
+                        <div class="card-header"><h3><i class="fab fa-discord"></i> Discord</h3></div>
+                        <div class="discord-info">
+                            <div class="discord-user">
+                                <img src="" alt="" class="discord-avatar" id="pDiscordAvatar">
+                                <div><span class="discord-name" id="pDiscordName"></span></div>
+                            </div>
+                            <button class="btn btn-discord-copy" id="pCopyDiscord"><i class="fas fa-copy"></i> Copier</button>
+                        </div>
+                    </div>
+                    <div class="card" id="playerAvailCard" style="display:none">
+                        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Disponibilités</h3></div>
+                        <div class="availability-grid" id="playerAvail"></div>
+                    </div>
+                </div>
+                <div class="profile-right">
+                    <div class="card">
+                        <div class="card-header"><h3><i class="fas fa-gamepad"></i> Jeux</h3></div>
+                        <div class="games-list" id="playerGames"></div>
+                    </div>
+                    <div class="card" id="playerLFCard" style="display:none">
+                        <div class="card-header"><h3><i class="fas fa-search"></i> Recherche</h3></div>
+                        <div class="looking-for" id="playerLF"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="page-content" id="notFound" style="display:none">
+        <div class="empty-page">
+            <div class="empty-page-icon"><i class="fas fa-ghost"></i></div>
+            <h2>Joueur introuvable</h2>
+            <p>Ce joueur n'existe pas ou a été supprimé.</p>
+            <a href="index.html" class="btn btn-primary btn-lg"><i class="fas fa-arrow-left"></i> Retour</a>
+        </div>
+    </div>
+
+    <script src="js/data.js"></script>
+    <script src="js/auth-bridge.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!TTM.Auth.requireAuth()) return;
+        renderNavbar('');
+        const params = new URLSearchParams(location.search);
+        const pid = params.get('id');
+        const player = TTM.getPlayerById(pid);
+
+        if (!player) {
+            document.getElementById('notFound').style.display = 'flex';
+            return;
+        }
+
+        document.title = `TTM — ${player.name}`;
+        document.getElementById('playerContent').style.display = 'block';
+
+        // Header
+        document.getElementById('playerAvatar').src = player.avatar;
+        document.getElementById('playerName').textContent = player.name;
+        document.getElementById('playerName').insertAdjacentHTML('afterend', ' ' + getLevelBadge(player.stats.level));
+        document.getElementById('playerTagline').textContent = player.tagline || 'Joueur TTM';
+        const ps = document.getElementById('playerStatus');
+        ps.className = 'profile-status ' + player.status;
+
+        // Meta
+        let mHTML = '';
+        if (player.country) mHTML += `<span><i class="fas fa-map-marker-alt"></i> ${player.country}</span>`;
+        if (player.platform) mHTML += `<span><i class="fas fa-desktop"></i> ${player.platform}</span>`;
+        if (player.playstyle) mHTML += `<span><i class="fas fa-trophy"></i> ${player.playstyle === 'competitive' ? 'Compétitif' : 'Casual'}</span>`;
+        const statusTxt = player.status === 'online' ? 'En ligne' : player.status === 'idle' ? 'Absent' : 'Hors ligne';
+        mHTML += `<span><i class="fas fa-circle" style="font-size:8px;color:${player.status==='online'?'#00d68f':player.status==='idle'?'#ffaa00':'#6a6a80'}"></i> ${statusTxt}</span>`;
+        document.getElementById('playerMeta').innerHTML = mHTML;
+
+        // Actions
+        const isContact = TTM.isContact(pid);
+        document.getElementById('playerActions').innerHTML = `
+            <button class="btn btn-primary" id="inviteBtn"><i class="fas fa-paper-plane"></i> Inviter à jouer</button>
+            <a href="chat.html?open=${pid}" class="btn btn-secondary"><i class="fas fa-comment-dots"></i> Message</a>
+            <button class="btn ${isContact?'btn-ghost':'btn-secondary'}" id="contactBtn"><i class="fas fa-${isContact?'user-check':'user-plus'}"></i> ${isContact?'Contact':'Ajouter'}</button>
+        `;
+
+        document.getElementById('inviteBtn').addEventListener('click', () => openInvite(player));
+        document.getElementById('contactBtn').addEventListener('click', function() {
+            if (TTM.isContact(pid)) {
+                TTM.removeContact(pid);
+                this.innerHTML = '<i class="fas fa-user-plus"></i> Ajouter';
+                this.className = 'btn btn-secondary';
+                showToast('Contact retiré', 'success');
+            } else {
+                TTM.addContact(pid);
+                this.innerHTML = '<i class="fas fa-user-check"></i> Contact';
+                this.className = 'btn btn-ghost';
+                showToast('Contact ajouté !', 'success');
+            }
+        });
+
+        // Stats
+        const s = player.stats;
+        document.getElementById('playerStats').innerHTML = `
+            <div class="stat-item"><span class="stat-value">${s.level}</span><span class="stat-label">Niveau</span></div>
+            <div class="stat-item"><span class="stat-value">${s.teammates}</span><span class="stat-label">Coéquipiers</span></div>
+            <div class="stat-item"><span class="stat-value">${s.events}</span><span class="stat-label">Events</span></div>
+            <div class="stat-item"><span class="stat-value">${s.coopGames}</span><span class="stat-label">Jeux coop</span></div>
+            <div class="stat-item"><span class="stat-value">${s.currentGames}</span><span class="stat-label">Jeux du moment</span></div>
+            <div class="stat-item"><span class="stat-value">${s.referrals}</span><span class="stat-label">Parrainages</span></div>
+        `;
+
+        // About
+        document.getElementById('playerAbout').innerHTML = `<p>${player.description}</p>`;
+        let detHTML = '';
+        detHTML += `<div class="about-detail"><i class="fas fa-language"></i><div><span class="detail-label">Langues</span><span class="detail-value">${player.languages.map(l=>l==='fr'?'Français':l==='en'?'English':l).join(', ')}</span></div></div>`;
+        if (player.mic) detHTML += `<div class="about-detail"><i class="fas fa-headset"></i><div><span class="detail-label">Micro</span><span class="detail-value">Oui</span></div></div>`;
+        detHTML += `<div class="about-detail"><i class="fas fa-desktop"></i><div><span class="detail-label">Plateforme</span><span class="detail-value">${player.platform}</span></div></div>`;
+        detHTML += `<div class="about-detail"><i class="fas fa-trophy"></i><div><span class="detail-label">Style</span><span class="detail-value">${player.playstyle==='competitive'?'Compétitif':'Casual'}</span></div></div>`;
+        document.getElementById('playerDetails').innerHTML = detHTML;
+
+        // Discord
+        if (player.discord) {
+            document.getElementById('playerDiscordCard').style.display = 'block';
+            document.getElementById('pDiscordAvatar').src = player.avatar;
+            document.getElementById('pDiscordName').textContent = player.discord;
+            document.getElementById('pCopyDiscord').addEventListener('click', () => {
+                navigator.clipboard.writeText(player.discord);
+                showToast('Discord copié !', 'success');
+            });
+        }
+
+        // Availability
+        const avail = player.availability;
+        if (avail && Object.values(avail).some(a => a.length)) {
+            document.getElementById('playerAvailCard').style.display = 'block';
+            const sLabels = { matin:'Matin', aprem:'Aprèm', soir:'Soir', nuit:'Nuit' };
+            const sColors = { matin:'morning', aprem:'afternoon', soir:'evening', nuit:'night' };
+            const dLabels = { lun:'Lun', mar:'Mar', mer:'Mer', jeu:'Jeu', ven:'Ven', sam:'Sam', dim:'Dim' };
+            document.getElementById('playerAvail').innerHTML = Object.entries(dLabels).map(([k,l]) => {
+                const sl = avail[k] || [];
+                return `<div class="avail-day"><span class="avail-label">${l}</span><div class="avail-slots">${sl.length ? sl.map(s=>`<span class="avail-slot ${sColors[s]}">${sLabels[s]}</span>`).join('') : '<span style="color:var(--text-muted);font-size:12px">—</span>'}</div></div>`;
+            }).join('');
+        }
+
+        // Games
+        document.getElementById('playerGames').innerHTML = player.games.length ? player.games.map(g => {
+            const info = TTM.getGameById(g.id);
+            const color = info ? info.color : '#6c5ce7';
+            return `
+            <div class="game-card" style="border-left:3px solid ${color}">
+                <div class="game-card-header">
+                    <div class="game-icon" style="background:${color}22;color:${color}">${getGameIconHTML(info)}</div>
+                    <div class="game-info"><h4>${g.name}</h4></div>
+                    <div class="game-rank"><div class="rank-badge" style="background:${g.rankColor}22;color:${g.rankColor}"><i class="${g.rankIcon}"></i><span>${g.rank}</span></div></div>
+                </div>
+                <div class="game-details">
+                    <div class="game-detail"><span class="detail-key">Rôle</span><span class="detail-val">${g.role}</span></div>
+                    ${g.agents?`<div class="game-detail"><span class="detail-key">Mains</span><span class="detail-val">${g.agents}</span></div>`:''}
+                    ${g.hours?`<div class="game-detail"><span class="detail-key">Heures</span><span class="detail-val">${g.hours}</span></div>`:''}
+                </div>
+            </div>`;
+        }).join('') : '<div class="empty-state small"><i class="fas fa-gamepad"></i><p>Aucun jeu ajouté</p></div>';
+
+        // Looking For
+        if (player.lookingFor?.length) {
+            document.getElementById('playerLFCard').style.display = 'block';
+            document.getElementById('playerLF').innerHTML = player.lookingFor.map(lf => `
+                <div class="lf-item">
+                    <div class="lf-icon"><i class="fas fa-user-friends"></i></div>
+                    <div class="lf-info"><h4>${lf.title}</h4><p>${lf.desc}</p></div>
+                    <span class="lf-status open">Ouvert</span>
+                </div>
+            `).join('');
+        }
+
+        // Invite Modal
+        const modal = document.getElementById('inviteModal');
+        document.getElementById('inviteClose')?.addEventListener('click', () => modal.style.display = 'none');
+        document.getElementById('inviteCancel')?.addEventListener('click', () => modal.style.display = 'none');
+        modal?.addEventListener('click', e => { if(e.target===modal) modal.style.display='none'; });
+
+        document.getElementById('inviteSend')?.addEventListener('click', () => {
+            const game = document.getElementById('inviteGame').value;
+            const msg = document.getElementById('inviteMsg').value.trim();
+            if (!msg) { showToast('Ecris un message', 'warning'); return; }
+            if (!TTM.isProfileSetup()) { showToast('Configure ton profil d\'abord', 'warning'); return; }
+            TTM.sendInvite(pid, msg, game);
+            modal.style.display = 'none';
+            showToast('Invitation envoyée !', 'success');
+        });
+
+        function openInvite(p) {
+            if (!TTM.isProfileSetup()) { showToast('Configure ton profil !', 'warning'); setTimeout(()=>location.href='settings.html',1200); return; }
+            document.getElementById('invitePreview').innerHTML = `<img src="${p.avatar}" style="width:40px;height:40px;border-radius:10px"><div><strong>${p.name}</strong><br><span style="color:var(--text-muted);font-size:13px">${p.tagline}</span></div>`;
+            document.getElementById('inviteGame').innerHTML = p.games.map(g => `<option value="${g.name}">${g.name}</option>`).join('');
+            document.getElementById('inviteMsg').value = '';
+            modal.style.display = 'flex';
+            setTimeout(() => document.getElementById('inviteMsg').focus(), 200);
+        }
+    });
+    </script>
+</body>
+</html>

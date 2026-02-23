@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTM — Paramètres</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar" id="navbar"></nav>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <section class="settings-page">
+            <!-- SIDEBAR NAV -->
+            <div class="settings-nav">
+                <div class="settings-nav-list">
+                    <button class="settings-nav-item active" data-section="general"><i class="fas fa-user"></i> Général</button>
+                    <button class="settings-nav-item" data-section="games"><i class="fas fa-gamepad"></i> Jeux</button>
+                    <button class="settings-nav-item" data-section="availability"><i class="fas fa-calendar-alt"></i> Disponibilités</button>
+                    <button class="settings-nav-item" data-section="looking"><i class="fas fa-search"></i> Recherche</button>
+                    <button class="settings-nav-item" data-section="tags"><i class="fas fa-tags"></i> Tags</button>
+                    <button class="settings-nav-item" data-section="account"><i class="fas fa-shield-alt"></i> Compte</button>
+                    <button class="settings-nav-item" data-section="danger"><i class="fas fa-trash"></i> Données</button>
+                </div>
+            </div>
+
+                <!-- CONTENT -->
+                <div class="settings-content">
+
+                    <!-- GENERAL -->
+                    <div class="settings-panel active" id="panel-general">
+                        <div class="profile-completeness" id="profileCompleteness">
+                            <span style="font-size:13px;color:var(--text-secondary)"><i class="fas fa-chart-pie" style="color:var(--accent);margin-right:6px"></i>Profil complété à</span>
+                            <div class="completeness-bar"><div class="completeness-fill" id="completeFill" style="width:0%"></div></div>
+                            <span class="completeness-text" id="completeText">0%</span>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3>Informations générales</h3></div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <label>Pseudo <span class="required">*</span></label>
+                                    <input type="text" class="form-input" id="s-username" placeholder="Ton pseudo in-game" maxlength="20">
+                                </div>
+                                <div class="form-group">
+                                    <label>Tagline</label>
+                                    <input type="text" class="form-input" id="s-tagline" placeholder="Ex: Support main — Chill & Compétitif" maxlength="60">
+                                </div>
+                                <div class="form-group">
+                                    <label>Description</label>
+                                    <textarea class="form-input" id="s-description" rows="4" placeholder="Parle de toi, ton style de jeu, ce que tu cherches..." maxlength="500"></textarea>
+                                    <span class="form-hint"><span id="descCount">0</span>/500</span>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Discord</label>
+                                        <input type="text" class="form-input" id="s-discord" placeholder="Pseudo#1234">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Pays</label>
+                                        <select class="form-input" id="s-country">
+                                            <option value="">Sélectionner</option>
+                                            <option value="France">France</option>
+                                            <option value="Belgique">Belgique</option>
+                                            <option value="Suisse">Suisse</option>
+                                            <option value="Canada">Canada</option>
+                                            <option value="Maroc">Maroc</option>
+                                            <option value="Algérie">Algérie</option>
+                                            <option value="Tunisie">Tunisie</option>
+                                            <option value="Autre">Autre</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Plateforme</label>
+                                        <select class="form-input" id="s-platform">
+                                            <option value="">Sélectionner</option>
+                                            <option value="PC">PC</option>
+                                            <option value="PlayStation">PlayStation</option>
+                                            <option value="Xbox">Xbox</option>
+                                            <option value="Switch">Switch</option>
+                                            <option value="Mobile">Mobile</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Style de jeu</label>
+                                        <select class="form-input" id="s-playstyle">
+                                            <option value="">Sélectionner</option>
+                                            <option value="competitive">Compétitif</option>
+                                            <option value="casual">Casual / Chill</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Langues</label>
+                                    <div class="checkbox-group" id="s-languages">
+                                        <label class="checkbox-label"><input type="checkbox" value="Français"><span>Français</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" value="English"><span>English</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" value="Español"><span>Español</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" value="Deutsch"><span>Deutsch</span></label>
+                                        <label class="checkbox-label"><input type="checkbox" value="العربية"><span>العربية</span></label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-label main-checkbox"><input type="checkbox" id="s-mic"> <i class="fas fa-headset"></i> J'ai un micro</label>
+                                </div>
+                                <div class="form-group">
+                                    <label>URL Avatar (optionnel)</label>
+                                    <input type="text" class="form-input" id="s-avatar" placeholder="https://... (laisse vide pour auto-générer)">
+                                    <span class="form-hint">Laisse vide et un avatar sera généré à partir de ton pseudo</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-lg save-btn" id="saveGeneral"><i class="fas fa-save"></i> Sauvegarder</button>
+                    </div>
+
+                    <!-- GAMES -->
+                    <div class="settings-panel" id="panel-games">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Mes Jeux</h3>
+                                <button class="btn btn-sm btn-primary" id="addGameBtn"><i class="fas fa-plus"></i> Ajouter un jeu</button>
+                            </div>
+                            <div id="gamesList" class="games-settings-list"></div>
+                        </div>
+
+                        <!-- ADD GAME FORM -->
+                        <div class="card" id="addGameForm" style="display:none">
+                            <div class="card-header"><h3>Ajouter un jeu</h3></div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <label>Jeu</label>
+                                    <select class="form-input" id="ag-game">
+                                        <option value="">Sélectionner un jeu</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Rang</label>
+                                    <select class="form-input" id="ag-rank"><option value="">Sélectionner d'abord un jeu</option></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Rôle</label>
+                                    <select class="form-input" id="ag-role"><option value="">Sélectionner d'abord un jeu</option></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Persos/Agents/Champions favoris</label>
+                                    <input type="text" class="form-input" id="ag-mains" placeholder="Ex: Jett, Reyna, Raze">
+                                </div>
+                                <div class="form-group">
+                                    <label>Heures de jeu</label>
+                                    <input type="text" class="form-input" id="ag-hours" placeholder="Ex: 500h">
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-ghost" id="cancelGame">Annuler</button>
+                                    <button class="btn btn-primary" id="confirmGame"><i class="fas fa-check"></i> Ajouter</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AVAILABILITY -->
+                    <div class="settings-panel" id="panel-availability">
+                        <div class="card">
+                            <div class="card-header"><h3>Mes Disponibilités</h3></div>
+                            <p class="card-desc">Indique quand tu es disponible pour jouer</p>
+                            <div class="avail-settings" id="availSettings"></div>
+                        </div>
+                        <button class="btn btn-primary btn-lg save-btn" id="saveAvail"><i class="fas fa-save"></i> Sauvegarder</button>
+                    </div>
+
+                    <!-- LOOKING FOR -->
+                    <div class="settings-panel" id="panel-looking">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Ce que je recherche</h3>
+                                <button class="btn btn-sm btn-primary" id="addLFBtn"><i class="fas fa-plus"></i> Ajouter</button>
+                            </div>
+                            <div id="lfList" class="lf-settings-list"></div>
+                        </div>
+                        <div class="card" id="addLFForm" style="display:none">
+                            <div class="card-header"><h3>Nouvelle recherche</h3></div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <label>Titre</label>
+                                    <input type="text" class="form-input" id="lf-title" placeholder="Ex: Duo Ranked Valorant" maxlength="40">
+                                </div>
+                                <div class="form-group">
+                                    <label>Description</label>
+                                    <input type="text" class="form-input" id="lf-desc" placeholder="Ex: Diamond+ — Soirs en semaine — Discord" maxlength="80">
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-ghost" id="cancelLF">Annuler</button>
+                                    <button class="btn btn-primary" id="confirmLF"><i class="fas fa-check"></i> Ajouter</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAGS -->
+                    <div class="settings-panel" id="panel-tags">
+                        <div class="card">
+                            <div class="card-header"><h3><i class="fas fa-tags"></i> Mes Tags</h3></div>
+                            <p class="card-desc">Sélectionne les tags qui te décrivent. Ils seront visibles sur ton profil et utilisés pour le matchmaking LFG.</p>
+                            <div class="tags-editor" id="tagsEditor"></div>
+                        </div>
+                        <button class="btn btn-primary btn-lg save-btn" id="saveTags"><i class="fas fa-save"></i> Sauvegarder les tags</button>
+                    </div>
+
+                    <!-- ACCOUNT -->
+                    <div class="settings-panel" id="panel-account">
+                        <div class="card">
+                            <div class="card-header"><h3><i class="fas fa-shield-alt"></i> Mon compte</h3></div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <label>Identifiant de connexion</label>
+                                    <div class="account-info-value" id="accountUsername"></div>
+                                    <span class="form-hint">Ce pseudo est utilisé pour te connecter</span>
+                                </div>
+                                <div class="form-group">
+                                    <label>Compte créé le</label>
+                                    <div class="account-info-value" id="accountDate"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card" style="margin-top:20px">
+                            <div class="card-header"><h3><i class="fas fa-key"></i> Changer le mot de passe</h3></div>
+                            <div class="settings-form">
+                                <div class="form-group">
+                                    <label>Mot de passe actuel</label>
+                                    <input type="password" class="form-input" id="cp-old" placeholder="Ton mot de passe actuel">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nouveau mot de passe</label>
+                                    <input type="password" class="form-input" id="cp-new" placeholder="Min. 4 caractères">
+                                </div>
+                                <div class="form-group">
+                                    <label>Confirmer le nouveau mot de passe</label>
+                                    <input type="password" class="form-input" id="cp-confirm" placeholder="Retape le nouveau mot de passe">
+                                </div>
+                                <button class="btn btn-primary" id="changePasswordBtn"><i class="fas fa-key"></i> Changer le mot de passe</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DANGER ZONE -->
+                    <div class="settings-panel" id="panel-danger">
+                        <div class="card card-danger">
+                            <div class="card-header"><h3><i class="fas fa-exclamation-triangle"></i> Zone dangereuse</h3></div>
+                            <p class="card-desc">Ces actions sont irréversibles.</p>
+                            <div class="danger-actions">
+                                <button class="btn btn-danger-ghost" id="resetProfile"><i class="fas fa-undo"></i> Réinitialiser mon profil</button>
+                                <button class="btn btn-danger" id="deleteAccount"><i class="fas fa-trash"></i> Supprimer mon compte</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+    </section>
+
+    <script src="js/data.js"></script>
+    <script src="js/auth-bridge.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!TTM.Auth.requireAuth()) return;
+        renderNavbar('settings');
+        const profile = TTM.getProfile();
+
+        // === NAV ===
+        document.querySelectorAll('.settings-nav-item').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.settings-nav-item').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('panel-' + btn.dataset.section).classList.add('active');
+            });
+        });
+
+        // Check URL hash for direct section
+        if (location.hash) {
+            const sec = location.hash.replace('#','');
+            const btn = document.querySelector(`[data-section="${sec}"]`);
+            if (btn) btn.click();
+        }
+
+        // === PROFILE COMPLETENESS ===
+        function updateCompleteness() {
+            const pct = TTM.getProfileCompleteness();
+            document.getElementById('completeFill').style.width = pct + '%';
+            document.getElementById('completeText').textContent = pct + '%';
+        }
+        updateCompleteness();
+
+        // === LOAD GENERAL ===
+        document.getElementById('s-username').value = profile.username || '';
+        document.getElementById('s-tagline').value = profile.tagline || '';
+        document.getElementById('s-description').value = profile.description || '';
+        document.getElementById('s-discord').value = profile.discord || '';
+        document.getElementById('s-country').value = profile.country || '';
+        document.getElementById('s-platform').value = profile.platform || '';
+        document.getElementById('s-playstyle').value = profile.playstyle || '';
+        document.getElementById('s-mic').checked = profile.mic || false;
+        document.getElementById('s-avatar').value = profile.avatar || '';
+
+        // Languages
+        if (profile.languages?.length) {
+            document.querySelectorAll('#s-languages input').forEach(cb => {
+                cb.checked = profile.languages.includes(cb.value);
+            });
+        }
+
+        // Desc counter
+        const desc = document.getElementById('s-description');
+        const cnt = document.getElementById('descCount');
+        desc.addEventListener('input', () => cnt.textContent = desc.value.length);
+        cnt.textContent = desc.value.length;
+
+        // === SAVE GENERAL ===
+        document.getElementById('saveGeneral').addEventListener('click', () => {
+            const username = document.getElementById('s-username').value.trim();
+            if (!username) { showToast('Le pseudo est obligatoire !', 'error'); return; }
+
+            const p = TTM.getProfile();
+            p.username = username;
+            p.tagline = document.getElementById('s-tagline').value.trim();
+            p.description = document.getElementById('s-description').value.trim();
+            p.discord = document.getElementById('s-discord').value.trim();
+            p.country = document.getElementById('s-country').value;
+            p.platform = document.getElementById('s-platform').value;
+            p.playstyle = document.getElementById('s-playstyle').value;
+            p.mic = document.getElementById('s-mic').checked;
+            p.avatar = document.getElementById('s-avatar').value.trim();
+            p.languages = [...document.querySelectorAll('#s-languages input:checked')].map(c => c.value);
+
+            TTM.saveProfile(p);
+            showToast('Profil sauvegardé !', 'success');
+            updateNavAvatar();
+            updateCompleteness();
+        });
+
+        // === GAMES ===
+        const agSelect = document.getElementById('ag-game');
+        TTM.gamesList.forEach(g => {
+            const o = document.createElement('option');
+            o.value = g.id; o.textContent = g.name;
+            agSelect.appendChild(o);
+        });
+
+        agSelect.addEventListener('change', () => {
+            const game = TTM.getGameById(agSelect.value);
+            const rankSel = document.getElementById('ag-rank');
+            const roleSel = document.getElementById('ag-role');
+            rankSel.innerHTML = '<option value="">Sélectionner</option>';
+            roleSel.innerHTML = '<option value="">Sélectionner</option>';
+            if (game) {
+                game.ranks.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; rankSel.appendChild(o); });
+                game.roles.forEach(r => { const o = document.createElement('option'); o.value = r; o.textContent = r; roleSel.appendChild(o); });
+            }
+        });
+
+        document.getElementById('addGameBtn').addEventListener('click', () => {
+            document.getElementById('addGameForm').style.display = 'block';
+            agSelect.value = '';
+        });
+        document.getElementById('cancelGame').addEventListener('click', () => {
+            document.getElementById('addGameForm').style.display = 'none';
+        });
+        document.getElementById('confirmGame').addEventListener('click', () => {
+            const gameId = agSelect.value;
+            if (!gameId) { showToast('Sélectionne un jeu', 'warning'); return; }
+            const gameInfo = TTM.getGameById(gameId);
+            const p = TTM.getProfile();
+            if (!p.games) p.games = [];
+            if (p.games.find(g => g.gameId === gameId)) { showToast('Tu as déjà ajouté ce jeu', 'warning'); return; }
+
+            p.games.push({
+                gameId,
+                gameName: gameInfo.name,
+                rank: document.getElementById('ag-rank').value,
+                role: document.getElementById('ag-role').value,
+                mains: document.getElementById('ag-mains').value.trim(),
+                hours: document.getElementById('ag-hours').value.trim()
+            });
+            p.stats.currentGames = p.games.length;
+            TTM.saveProfile(p);
+            renderGamesList();
+            document.getElementById('addGameForm').style.display = 'none';
+            showToast(`${gameInfo.name} ajouté !`, 'success');
+            // Clear form
+            agSelect.value = ''; document.getElementById('ag-rank').innerHTML = '<option value="">Sélectionner</option>';
+            document.getElementById('ag-role').innerHTML = '<option value="">Sélectionner</option>';
+            document.getElementById('ag-mains').value = ''; document.getElementById('ag-hours').value = '';
+        });
+
+        function renderGamesList() {
+            const p = TTM.getProfile();
+            const list = document.getElementById('gamesList');
+            if (!p.games?.length) {
+                list.innerHTML = '<div class="empty-state small"><i class="fas fa-gamepad"></i><p>Aucun jeu ajouté</p></div>';
+                return;
+            }
+            list.innerHTML = p.games.map((g, i) => {
+                const info = TTM.getGameById(g.gameId);
+                const color = info ? info.color : '#6c5ce7';
+                return `
+                <div class="game-setting-item" style="border-left:3px solid ${color}">
+                    <div class="game-setting-info">
+                        <div class="game-icon" style="background:${color}22;color:${color}">${getGameIconHTML(info)}</div>
+                        <div>
+                            <strong>${g.gameName}</strong>
+                            <span>${[g.rank, g.role].filter(Boolean).join(' — ') || 'Non configuré'}</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-danger-ghost remove-game" data-idx="${i}"><i class="fas fa-trash"></i></button>
+                </div>`;
+            }).join('');
+            list.querySelectorAll('.remove-game').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const p = TTM.getProfile();
+                    p.games.splice(+btn.dataset.idx, 1);
+                    p.stats.currentGames = p.games.length;
+                    TTM.saveProfile(p);
+                    renderGamesList();
+                    showToast('Jeu supprimé', 'success');
+                });
+            });
+        }
+        renderGamesList();
+
+        // === AVAILABILITY ===
+        const days = { lun: 'Lundi', mar: 'Mardi', mer: 'Mercredi', jeu: 'Jeudi', ven: 'Vendredi', sam: 'Samedi', dim: 'Dimanche' };
+        const slots = ['matin', 'aprem', 'soir', 'nuit'];
+        const slotLabels = { matin: 'Matin', aprem: 'Après-midi', soir: 'Soir', nuit: 'Nuit' };
+        const availDiv = document.getElementById('availSettings');
+        let availHTML = '';
+        for (const [key, label] of Object.entries(days)) {
+            const checked = profile.availability?.[key] || [];
+            availHTML += `<div class="avail-setting-row"><span class="avail-setting-label">${label}</span><div class="avail-setting-slots">`;
+            slots.forEach(s => {
+                const isChecked = checked.includes(s) ? 'checked' : '';
+                availHTML += `<label class="avail-chip ${isChecked ? 'active' : ''}"><input type="checkbox" data-day="${key}" data-slot="${s}" ${isChecked}> ${slotLabels[s]}</label>`;
+            });
+            availHTML += '</div></div>';
+        }
+        availDiv.innerHTML = availHTML;
+
+        availDiv.querySelectorAll('.avail-chip input').forEach(cb => {
+            cb.addEventListener('change', () => {
+                cb.parentElement.classList.toggle('active', cb.checked);
+            });
+        });
+
+        document.getElementById('saveAvail').addEventListener('click', () => {
+            const p = TTM.getProfile();
+            p.availability = { lun: [], mar: [], mer: [], jeu: [], ven: [], sam: [], dim: [] };
+            availDiv.querySelectorAll('input:checked').forEach(cb => {
+                p.availability[cb.dataset.day].push(cb.dataset.slot);
+            });
+            TTM.saveProfile(p);
+            showToast('Disponibilités sauvegardées !', 'success');
+        });
+
+        // === LOOKING FOR ===
+        function renderLFList() {
+            const p = TTM.getProfile();
+            const list = document.getElementById('lfList');
+            if (!p.lookingFor?.length) {
+                list.innerHTML = '<div class="empty-state small"><i class="fas fa-search"></i><p>Aucune recherche active</p></div>';
+                return;
+            }
+            list.innerHTML = p.lookingFor.map((lf, i) => `
+                <div class="lf-setting-item">
+                    <div class="lf-setting-info">
+                        <i class="fas fa-user-friends" style="color:var(--accent)"></i>
+                        <div><strong>${lf.title}</strong><span>${lf.desc}</span></div>
+                    </div>
+                    <button class="btn btn-sm btn-danger-ghost remove-lf" data-idx="${i}"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+            list.querySelectorAll('.remove-lf').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const p = TTM.getProfile();
+                    p.lookingFor.splice(+btn.dataset.idx, 1);
+                    TTM.saveProfile(p);
+                    renderLFList();
+                    showToast('Recherche supprimée', 'success');
+                });
+            });
+        }
+        renderLFList();
+
+        document.getElementById('addLFBtn').addEventListener('click', () => document.getElementById('addLFForm').style.display = 'block');
+        document.getElementById('cancelLF').addEventListener('click', () => document.getElementById('addLFForm').style.display = 'none');
+        document.getElementById('confirmLF').addEventListener('click', () => {
+            const title = document.getElementById('lf-title').value.trim();
+            const desc = document.getElementById('lf-desc').value.trim();
+            if (!title) { showToast('Ajoute un titre', 'warning'); return; }
+            const p = TTM.getProfile();
+            if (!p.lookingFor) p.lookingFor = [];
+            p.lookingFor.push({ title, desc });
+            TTM.saveProfile(p);
+            renderLFList();
+            document.getElementById('addLFForm').style.display = 'none';
+            document.getElementById('lf-title').value = '';
+            document.getElementById('lf-desc').value = '';
+            showToast('Recherche ajoutée !', 'success');
+        });
+
+        // === ACCOUNT ===
+        document.getElementById('accountUsername').textContent = TTM.Auth.getCurrentUsername() || '—';
+
+        // === TAGS EDITOR ===
+        const tagsEditor = document.getElementById('tagsEditor');
+        const profileTags = profile.tags || { jeu: [], niveau: [], style: [], contraintes: [], dispo: [] };
+
+        TTM.tagCategories.forEach(cat => {
+            const section = document.createElement('div');
+            section.className = 'tag-category';
+            section.innerHTML = `
+                <div class="tag-category-header">
+                    <i class="${cat.icon}" style="color:${cat.color}"></i>
+                    <span>${cat.label}</span>
+                </div>
+                <div class="tag-buttons" data-cat="${cat.id}">
+                    ${cat.tags.map(t => {
+                        const active = (profileTags[cat.id] || []).includes(t);
+                        return `<button class="tag-btn${active ? ' active' : ''}" data-tag="${t}" style="--tag-color:${cat.color}">#${t}</button>`;
+                    }).join('')}
+                </div>
+            `;
+            tagsEditor.appendChild(section);
+        });
+
+        tagsEditor.querySelectorAll('.tag-btn').forEach(btn => {
+            btn.addEventListener('click', () => btn.classList.toggle('active'));
+        });
+
+        document.getElementById('saveTags').addEventListener('click', () => {
+            const p = TTM.getProfile();
+            p.tags = {};
+            TTM.tagCategories.forEach(cat => {
+                p.tags[cat.id] = [];
+                tagsEditor.querySelectorAll(`.tag-buttons[data-cat="${cat.id}"] .tag-btn.active`).forEach(btn => {
+                    p.tags[cat.id].push(btn.dataset.tag);
+                });
+            });
+            TTM.saveProfile(p);
+            showToast('Tags sauvegardés !', 'success');
+            updateCompleteness();
+        });
+        const acctDate = TTM.Auth.getAccountCreatedAt();
+        document.getElementById('accountDate').textContent = acctDate ? new Date(acctDate).toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+
+        document.getElementById('changePasswordBtn').addEventListener('click', () => {
+            const oldP = document.getElementById('cp-old').value;
+            const newP = document.getElementById('cp-new').value;
+            const conf = document.getElementById('cp-confirm').value;
+            if (!oldP || !newP || !conf) { showToast('Remplis tous les champs', 'error'); return; }
+            if (newP !== conf) { showToast('Les mots de passe ne correspondent pas', 'error'); return; }
+            const res = TTM.Auth.changePassword(oldP, newP);
+            if (res.ok) {
+                showToast('Mot de passe changé !', 'success');
+                document.getElementById('cp-old').value = '';
+                document.getElementById('cp-new').value = '';
+                document.getElementById('cp-confirm').value = '';
+            } else {
+                showToast(res.error, 'error');
+            }
+        });
+
+        // === DANGER ZONE ===
+        document.getElementById('resetProfile').addEventListener('click', () => {
+            if (confirm('Réinitialiser ton profil ? Tes messages et contacts seront conservés.')) {
+                const p = { ...TTM.defaultProfile };
+                p.username = TTM.Auth.getCurrentUsername();
+                p.createdAt = new Date().toISOString();
+                TTM.saveProfile(p);
+                showToast('Profil réinitialisé', 'success');
+                setTimeout(() => location.reload(), 1000);
+            }
+        });
+        document.getElementById('deleteAccount').addEventListener('click', () => {
+            if (confirm('Supprimer ton compte et toutes tes données ? Cette action est irréversible.')) {
+                TTM.Auth.deleteAccount();
+            }
+        });
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTM — Mon Profil</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar" id="navbar"></nav>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- NO PROFILE STATE -->
+    <div class="page-content" id="noProfile" style="display:none">
+        <div class="empty-page">
+            <div class="empty-page-icon"><i class="fas fa-user-slash"></i></div>
+            <h2>Profil non configuré</h2>
+            <p>Tu n'as pas encore configuré ton profil. Fais-le maintenant pour apparaitre dans la recherche !</p>
+            <a href="settings.html" class="btn btn-primary btn-lg"><i class="fas fa-cog"></i> Configurer mon profil</a>
+        </div>
+    </div>
+
+    <!-- PROFILE CONTENT -->
+    <section class="profile-section" id="profileContent" style="display:none">
+        <div class="container">
+            <div class="profile-card">
+                <div class="profile-banner" id="profileBanner">
+                    <div class="profile-banner-overlay"></div>
+                </div>
+                <div class="profile-header">
+                    <div class="profile-avatar-wrap">
+                        <img src="" alt="Avatar" class="profile-avatar" id="profileAvatar">
+                        <span class="profile-status online"></span>
+                    </div>
+                    <div class="profile-info">
+                        <div class="profile-name-row">
+                            <h2 class="profile-name" id="profileName"></h2>
+                        </div>
+                        <p class="profile-tagline" id="profileTagline"></p>
+                        <div class="profile-meta" id="profileMeta"></div>
+                    </div>
+                    <div class="profile-actions">
+                        <a href="settings.html" class="btn btn-primary"><i class="fas fa-pen"></i> Modifier</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-grid">
+                <div class="profile-left">
+                    <!-- Stats -->
+                    <div class="card">
+                        <div class="card-header"><h3><i class="fas fa-chart-bar"></i> Statistiques</h3></div>
+                        <div class="stats-grid" id="profileStats"></div>
+                    </div>
+                    <!-- About -->
+                    <div class="card">
+                        <div class="card-header"><h3><i class="fas fa-user"></i> A propos</h3></div>
+                        <div class="about-content" id="profileAbout"></div>
+                        <div class="about-details" id="profileDetails"></div>
+                    </div>
+                    <!-- Discord -->
+                    <div class="card card-discord" id="discordCard" style="display:none">
+                        <div class="card-header"><h3><i class="fab fa-discord"></i> Discord</h3></div>
+                        <div class="discord-info">
+                            <div class="discord-user">
+                                <img src="" alt="" class="discord-avatar" id="discordAvatar">
+                                <div><span class="discord-name" id="discordName"></span></div>
+                            </div>
+                            <button class="btn btn-discord-copy" id="copyDiscord"><i class="fas fa-copy"></i> Copier</button>
+                        </div>
+                    </div>
+                    <!-- Availability -->
+                    <div class="card" id="availCard" style="display:none">
+                        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Disponibilités</h3></div>
+                        <div class="availability-grid" id="profileAvail"></div>
+                    </div>
+                </div>
+                <div class="profile-right">
+                    <!-- Games -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-gamepad"></i> Mes Jeux</h3>
+                            <a href="settings.html#games" class="btn btn-sm btn-secondary"><i class="fas fa-plus"></i> Gérer</a>
+                        </div>
+                        <div class="games-list" id="profileGames">
+                            <div class="empty-state small"><i class="fas fa-gamepad"></i><p>Aucun jeu ajouté — <a href="settings.html">Ajouter des jeux</a></p></div>
+                        </div>
+                    </div>
+                    <!-- Looking For -->
+                    <div class="card" id="lfCard" style="display:none">
+                        <div class="card-header"><h3><i class="fas fa-search"></i> Je recherche</h3></div>
+                        <div class="looking-for" id="profileLF"></div>
+                    </div>
+                    <!-- Teammates -->
+                    <div class="card">
+                        <div class="card-header"><h3><i class="fas fa-users"></i> Mes Contacts</h3></div>
+                        <div class="contacts-grid" id="profileContacts">
+                            <div class="empty-state small"><i class="fas fa-user-friends"></i><p>Aucun contact — <a href="index.html">Découvrir des joueurs</a></p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/data.js"></script>
+    <script src="js/auth-bridge.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!TTM.Auth.requireAuth()) return;
+        renderNavbar('profile');
+        initSearch();
+
+        TTM.computeStats();
+        const profile = TTM.getProfile();
+        if (!TTM.isProfileSetup()) {
+            document.getElementById('noProfile').style.display = 'flex';
+            return;
+        }
+
+        document.getElementById('profileContent').style.display = 'block';
+        const av = profile.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.username}&backgroundColor=b6e3f4`;
+        document.getElementById('profileAvatar').src = av;
+        document.getElementById('profileName').textContent = profile.username;
+        document.getElementById('profileTagline').textContent = profile.tagline || 'Pas de tagline';
+
+        // Level badge next to name
+        document.getElementById('profileName').insertAdjacentHTML('afterend', ' ' + getLevelBadge(profile.stats.level));
+
+        // Meta
+        const meta = document.getElementById('profileMeta');
+        let metaHTML = '';
+        if (profile.country) metaHTML += `<span><i class="fas fa-map-marker-alt"></i> ${profile.country}</span>`;
+        if (profile.platform) metaHTML += `<span><i class="fas fa-desktop"></i> ${profile.platform}</span>`;
+        if (profile.playstyle) metaHTML += `<span><i class="fas fa-trophy"></i> ${profile.playstyle === 'competitive' ? 'Compétitif' : 'Casual'}</span>`;
+        if (profile.createdAt) metaHTML += `<span><i class="fas fa-calendar"></i> Membre depuis ${new Date(profile.createdAt).toLocaleDateString('fr-FR', {month:'short',year:'numeric'})}</span>`;
+        meta.innerHTML = metaHTML;
+
+        // Stats
+        const s = profile.stats;
+        document.getElementById('profileStats').innerHTML = `
+            <div class="stat-item"><span class="stat-value">${s.level}</span><span class="stat-label">Niveau</span></div>
+            <div class="stat-item"><span class="stat-value">${s.teammates}</span><span class="stat-label">Coéquipiers</span></div>
+            <div class="stat-item"><span class="stat-value">${s.events}</span><span class="stat-label">Events</span></div>
+            <div class="stat-item"><span class="stat-value">${s.coopGames}</span><span class="stat-label">Jeux coop</span></div>
+            <div class="stat-item"><span class="stat-value">${s.currentGames}</span><span class="stat-label">Jeux du moment</span></div>
+            <div class="stat-item"><span class="stat-value">${s.referrals}</span><span class="stat-label">Parrainages</span></div>
+        `;
+
+        // About
+        document.getElementById('profileAbout').innerHTML = profile.description ? `<p>${profile.description.replace(/\n/g,'</p><p>')}</p>` : '<p style="color:var(--text-muted)">Pas de description — <a href="settings.html">Ajouter</a></p>';
+
+        let detailsHTML = '';
+        if (profile.languages?.length) detailsHTML += `<div class="about-detail"><i class="fas fa-language"></i><div><span class="detail-label">Langues</span><span class="detail-value">${profile.languages.join(', ')}</span></div></div>`;
+        if (profile.mic) detailsHTML += `<div class="about-detail"><i class="fas fa-headset"></i><div><span class="detail-label">Micro</span><span class="detail-value">Oui</span></div></div>`;
+        if (profile.platform) detailsHTML += `<div class="about-detail"><i class="fas fa-desktop"></i><div><span class="detail-label">Plateforme</span><span class="detail-value">${profile.platform}</span></div></div>`;
+        if (profile.playstyle) detailsHTML += `<div class="about-detail"><i class="fas fa-trophy"></i><div><span class="detail-label">Style</span><span class="detail-value">${profile.playstyle === 'competitive' ? 'Compétitif' : 'Casual'}</span></div></div>`;
+        document.getElementById('profileDetails').innerHTML = detailsHTML;
+
+        // Discord
+        if (profile.discord) {
+            document.getElementById('discordCard').style.display = 'block';
+            document.getElementById('discordAvatar').src = av;
+            document.getElementById('discordName').textContent = profile.discord;
+            document.getElementById('copyDiscord').addEventListener('click', () => {
+                navigator.clipboard.writeText(profile.discord);
+                showToast('Discord copié !', 'success');
+            });
+        }
+
+        // Availability
+        const avail = profile.availability;
+        const hasAvail = Object.values(avail).some(a => a.length > 0);
+        if (hasAvail) {
+            document.getElementById('availCard').style.display = 'block';
+            const slotLabels = { matin: 'Matin', aprem: 'Aprèm', soir: 'Soir', nuit: 'Nuit' };
+            const slotColors = { matin: 'morning', aprem: 'afternoon', soir: 'evening', nuit: 'night' };
+            const days = { lun: 'Lun', mar: 'Mar', mer: 'Mer', jeu: 'Jeu', ven: 'Ven', sam: 'Sam', dim: 'Dim' };
+            let availHTML = '';
+            for (const [key, label] of Object.entries(days)) {
+                const slots = avail[key] || [];
+                availHTML += `<div class="avail-day"><span class="avail-label">${label}</span><div class="avail-slots">${slots.length ? slots.map(s => `<span class="avail-slot ${slotColors[s]}">${slotLabels[s]}</span>`).join('') : '<span style="color:var(--text-muted);font-size:12px">—</span>'}</div></div>`;
+            }
+            document.getElementById('profileAvail').innerHTML = availHTML;
+        }
+
+        // Games
+        if (profile.games?.length) {
+            document.getElementById('profileGames').innerHTML = profile.games.map(g => {
+                const gameInfo = TTM.getGameById(g.gameId);
+                const color = gameInfo ? gameInfo.color : '#6c5ce7';
+                return `
+                <div class="game-card" style="border-left:3px solid ${color}">
+                    <div class="game-card-header">
+                        <div class="game-icon" style="background:${color}22;color:${color}">${getGameIconHTML(gameInfo)}</div>
+                        <div class="game-info"><h4>${g.gameName}</h4></div>
+                        <div class="game-rank"><div class="rank-badge" style="background:${color}22;color:${color}"><i class="fas fa-medal"></i><span>${g.rank||'Non classé'}</span></div></div>
+                    </div>
+                    <div class="game-details">
+                        ${g.role?`<div class="game-detail"><span class="detail-key">Rôle</span><span class="detail-val">${g.role}</span></div>`:''}
+                        ${g.mains?`<div class="game-detail"><span class="detail-key">Mains</span><span class="detail-val">${g.mains}</span></div>`:''}
+                        ${g.hours?`<div class="game-detail"><span class="detail-key">Heures</span><span class="detail-val">${g.hours}</span></div>`:''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Looking For
+        if (profile.lookingFor?.length) {
+            document.getElementById('lfCard').style.display = 'block';
+            document.getElementById('profileLF').innerHTML = profile.lookingFor.map(lf => `
+                <div class="lf-item">
+                    <div class="lf-icon"><i class="fas fa-user-friends"></i></div>
+                    <div class="lf-info"><h4>${lf.title}</h4><p>${lf.desc}</p></div>
+                    <span class="lf-status open">Ouvert</span>
+                </div>
+            `).join('');
+        }
+
+        // Contacts
+        const contacts = TTM.getContacts();
+        if (contacts.length) {
+            document.getElementById('profileContacts').innerHTML = contacts.map(cid => {
+                const cp = TTM.getPlayerById(cid);
+                if (!cp) return '';
+                return `
+                <a href="player.html?id=${cp.id}" class="contact-card">
+                    <img src="${cp.avatar}" alt="${cp.name}">
+                    <span>${cp.name}</span>
+                </a>`;
+            }).join('');
+        }
+    });
+    </script>
+</body>
+</html>
