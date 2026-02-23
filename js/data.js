@@ -6,6 +6,105 @@
 const TTM = {
 
     // ==========================================================
+    //  SERVER SYNC
+    // ==========================================================
+    _serverAvailable: false,
+    _serverPlayers: null,
+    _syncPromise: null,
+
+    async initServerSync() {
+        try {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            if (data.ok && data.mongodb) {
+                this._serverAvailable = true;
+                // Sync current profile to server if logged in
+                if (this.Auth.isLoggedIn()) {
+                    await this._syncProfileToServer();
+                }
+                // Load all players from server
+                await this._loadServerPlayers();
+            }
+        } catch (e) {
+            this._serverAvailable = false;
+        }
+    },
+
+    async _syncProfileToServer() {
+        if (!this._serverAvailable) return;
+        const localId = this.Auth.getCurrentUserId();
+        const profile = this.getProfile();
+        if (!localId || !profile.username) return;
+        try {
+            await fetch('/api/sync/profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ localId, profile })
+            });
+        } catch (e) { /* silently fail */ }
+    },
+
+    async _syncRegisterToServer(localId, username, password) {
+        if (!this._serverAvailable) return;
+        try {
+            await fetch('/api/sync/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ localId, username, password })
+            });
+        } catch (e) { /* silently fail */ }
+    },
+
+    async _loadServerPlayers() {
+        if (!this._serverAvailable) return;
+        try {
+            const currentLocalId = this.Auth.getCurrentUserId() || '';
+            const res = await fetch('/api/sync/players?exclude=' + encodeURIComponent(currentLocalId));
+            const data = await res.json();
+            if (data.ok) {
+                this._serverPlayers = data.players.map(p => this._mongoUserToPlayer(p));
+            }
+        } catch (e) { /* silently fail */ }
+    },
+
+    _mongoUserToPlayer(u) {
+        const games = (u.games || []).map(g => {
+            const info = this.getGameById(g.gameId);
+            const rs = this._rankStyle(g.rank);
+            return {
+                id: g.gameId,
+                name: g.gameName || (info ? info.name : g.gameId),
+                rank: g.rank || 'Non classé',
+                role: g.role || 'Flex',
+                agents: g.mains || '',
+                hours: g.hours || '—',
+                rankColor: rs.color,
+                rankIcon: rs.icon
+            };
+        });
+        return {
+            id: u._id || u.localId,
+            localId: u.localId || null,
+            name: u.username || 'Anonyme',
+            tagline: u.tagline || '',
+            description: u.description || '',
+            avatar: u.avatarURL || u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.username || '')}&backgroundColor=b6e3f4`,
+            discord: u.discord || '',
+            country: u.country || '',
+            languages: u.languages || [],
+            platform: u.platform || '',
+            playstyle: u.playstyle || 'casual',
+            mic: u.mic || false,
+            status: u.status || 'offline',
+            games: games,
+            tags: u.tags || { jeu: [], niveau: [], style: [], contraintes: [], dispo: [] },
+            stats: u.stats || { level: 1, teammates: 0, events: 0, coopGames: 0, currentGames: 0, referrals: 0 },
+            lookingFor: u.lookingFor || [],
+            availability: u.availability || {}
+        };
+    },
+
+    // ==========================================================
     //  AUTH SYSTEM
     // ==========================================================
     Auth: {
@@ -216,6 +315,8 @@ const TTM = {
     saveProfile(profile) {
         if (!profile.createdAt) profile.createdAt = new Date().toISOString();
         localStorage.setItem(this._key('profile'), JSON.stringify(profile));
+        // Sync to server in background
+        this._syncProfileToServer();
     },
 
     isProfileSetup() {
@@ -503,28 +604,39 @@ const TTM = {
 
     // Load all registered users as player objects (excluding current user)
     getAllPlayers() {
+        // Use server data if available
+        if (this._serverPlayers && this._serverPlayers.length > 0) {
+            return this._serverPlayers;
+        }
+        // Fallback to localStorage
         const users = this.Auth._getUsers();
         const currentId = this.Auth.getCurrentUserId();
         const players = [];
         users.forEach(u => {
-            if (u.id === currentId) return; // skip self
+            if (u.id === currentId) return;
             const raw = localStorage.getItem(`ttm_profile_${u.id}`);
             if (!raw) return;
             const profile = JSON.parse(raw);
-            if (!profile.username) return; // skip incomplete profiles
+            if (!profile.username) return;
             players.push(this._profileToPlayer(u.id, profile));
         });
         return players;
     },
 
     getPlayerById(id) {
-        // Try registered users
+        // Check server players first
+        if (this._serverPlayers) {
+            const sp = this._serverPlayers.find(p => p.id === id || p.localId === id);
+            if (sp) return sp;
+        }
+        // Fallback to localStorage
         const users = this.Auth._getUsers();
         const user = users.find(u => u.id === id);
         if (user) {
             const raw = localStorage.getItem(`ttm_profile_${id}`);
             if (raw) return this._profileToPlayer(id, JSON.parse(raw));
         }
+        // Try fetching from server by ID (sync fallback)
         return null;
     },
 
@@ -548,6 +660,17 @@ const TTM = {
 
     // Community stats for homepage hero
     getCommunityStats() {
+        // Use server data if available
+        if (this._serverPlayers) {
+            let totalLF = 0;
+            this._serverPlayers.forEach(p => { totalLF += (p.lookingFor || []).length; });
+            return {
+                players: this._serverPlayers.length + 1, // +1 for self
+                games: this.gamesList.length,
+                teams: totalLF
+            };
+        }
+        // Fallback to localStorage
         const users = this.Auth._getUsers();
         let totalLF = 0;
         users.forEach(u => {

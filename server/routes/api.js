@@ -1,14 +1,123 @@
 /* ============================================================
-   TTM — API Routes (Profile, Contacts, etc.)
+   TTM — API Routes (Profile, Contacts, Sync, etc.)
    ============================================================ */
 const router = require('express').Router();
+const crypto = require('crypto');
 const User = require('../models/User');
 
 // ---- Middleware: vérifier auth ----
 function requireAuth(req, res, next) {
     if (req.isAuthenticated && req.isAuthenticated()) return next();
+    if (req.user) return next(); // local session
     res.status(401).json({ ok: false, error: 'Non connecté' });
 }
+
+/* ============================================================
+   SYNC ENDPOINTS (pas d'auth requise — mode local)
+   ============================================================ */
+
+// ---- Sync: register local user ----
+router.post('/sync/register', async (req, res) => {
+    try {
+        const { localId, username, password } = req.body;
+        if (!localId || !username) return res.status(400).json({ ok: false, error: 'Données manquantes' });
+
+        // Check if username already exists in MongoDB
+        const existing = await User.findOne({ username: { $regex: `^${username.trim()}$`, $options: 'i' } });
+        if (existing && existing.localId !== localId) {
+            return res.status(409).json({ ok: false, error: 'Ce pseudo est déjà pris' });
+        }
+
+        const hash = password ? crypto.createHash('sha256').update(password).digest('hex') : '';
+
+        const user = await User.findOneAndUpdate(
+            { localId },
+            {
+                $set: {
+                    username: username.trim(),
+                    passwordHash: hash,
+                    status: 'online',
+                    lastSeen: new Date(),
+                },
+                $setOnInsert: { localId },
+            },
+            { upsert: true, new: true }
+        );
+
+        res.json({ ok: true, id: user._id, localId: user.localId });
+    } catch (e) {
+        console.error('Sync register error:', e.message);
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: save profile ----
+router.post('/sync/profile', async (req, res) => {
+    try {
+        const { localId, profile } = req.body;
+        if (!localId) return res.status(400).json({ ok: false, error: 'localId manquant' });
+
+        const update = {};
+        const fields = [
+            'username', 'tagline', 'description', 'avatar', 'country',
+            'platform', 'playstyle', 'mic', 'languages', 'games',
+            'availability', 'tags', 'lookingFor', 'stats', 'discord',
+        ];
+        fields.forEach(f => {
+            if (profile[f] !== undefined) update[f] = profile[f];
+        });
+        update.status = 'online';
+        update.lastSeen = new Date();
+
+        const user = await User.findOneAndUpdate(
+            { localId },
+            { $set: update, $setOnInsert: { localId } },
+            { upsert: true, new: true }
+        );
+
+        res.json({ ok: true, id: user._id });
+    } catch (e) {
+        console.error('Sync profile error:', e.message);
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: get all players ----
+router.get('/sync/players', async (req, res) => {
+    try {
+        const exclude = req.query.exclude || ''; // localId to exclude (self)
+        const filter = { username: { $exists: true, $ne: '' } };
+        if (exclude) filter.localId = { $ne: exclude };
+
+        const players = await User.find(filter)
+            .select('-passwordHash -email -guilds')
+            .sort({ lastSeen: -1 })
+            .limit(100);
+
+        res.json({ ok: true, players });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: get one player ----
+router.get('/sync/players/:id', async (req, res) => {
+    try {
+        let player = null;
+        // Try by MongoDB _id
+        if (req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+            player = await User.findById(req.params.id).select('-passwordHash -email -guilds');
+        }
+        // Try by localId
+        if (!player) {
+            player = await User.findOne({ localId: req.params.id }).select('-passwordHash -email -guilds');
+        }
+        if (!player) return res.status(404).json({ ok: false, error: 'Joueur introuvable' });
+        res.json({ ok: true, player });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
 
 // ---- Récupérer son propre profil ----
 router.get('/profile', requireAuth, async (req, res) => {

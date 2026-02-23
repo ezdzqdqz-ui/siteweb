@@ -5,12 +5,16 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
     // ---- Discord OAuth2 Data ----
-    discordId:       { type: String, required: true, unique: true, index: true },
+    discordId:       { type: String, sparse: true, unique: true, index: true },
     username:        { type: String, required: true },
     discriminator:   { type: String, default: '0' },
     avatar:          { type: String, default: '' },
     email:           { type: String, default: '' },
     guilds:          [{ id: String, name: String, icon: String }],
+
+    // ---- Local Auth ----
+    localId:         { type: String, sparse: true, unique: true },
+    passwordHash:    { type: String },
 
     // ---- Profile ----
     tagline:         { type: String, default: '', maxlength: 60 },
@@ -77,12 +81,14 @@ const userSchema = new mongoose.Schema({
 
 // ---- Virtual: avatar URL ----
 userSchema.virtual('avatarURL').get(function () {
-    if (this.avatar) {
+    if (this.discordId && this.avatar) {
         return `https://cdn.discordapp.com/avatars/${this.discordId}/${this.avatar}.${this.avatar.startsWith('a_') ? 'gif' : 'png'}?size=256`;
     }
-    // Default Discord avatar
-    const defaultIndex = (parseInt(this.discordId) >> 22) % 6;
-    return `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png`;
+    if (this.avatar && this.avatar.startsWith('http')) {
+        return this.avatar;
+    }
+    // Default avatar via DiceBear
+    return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(this.username || 'guest')}&backgroundColor=b6e3f4`;
 });
 
 // Ensure virtuals are included in JSON

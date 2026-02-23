@@ -111,8 +111,9 @@
     <script src="js/auth-bridge.js"></script>
     <script src="js/app.js"></script>
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
         if (!TTM.Auth.requireAuth()) return;
+        await TTM.initServerSync();
         renderNavbar('profile');
         initSearch();
 

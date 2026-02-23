@@ -196,7 +196,7 @@
         });
 
         // REGISTER
-        document.getElementById('registerForm').addEventListener('submit', e => {
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             hideError();
             const username = document.getElementById('reg-username').value.trim();
@@ -208,6 +208,11 @@
 
             const result = TTM.Auth.register(username, password);
             if (result.ok) {
+                // Sync registration to server
+                try { await TTM.initServerSync(); } catch(e) {}
+                await TTM._syncRegisterToServer(result.userId, username, password);
+                // Sync the default profile too
+                await TTM._syncProfileToServer();
                 showSuccess('Compte créé ! Configuration du profil...');
                 setTimeout(() => { location.href = 'settings.html'; }, 800);
             } else {
