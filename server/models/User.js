@@ -74,8 +74,8 @@ const userSchema = new mongoose.Schema({
     },
     lastSeen: { type: Date, default: Date.now },
 
-    // ---- Contacts ----
-    contacts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    // ---- Contacts (localId strings) ----
+    contacts: [{ type: String }],
 
 }, { timestamps: true });
 
