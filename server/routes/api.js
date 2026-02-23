@@ -41,7 +41,7 @@ router.post('/sync/register', async (req, res) => {
                 },
                 $setOnInsert: { localId },
             },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         res.json({ ok: true, id: user._id, localId: user.localId });
@@ -72,7 +72,7 @@ router.post('/sync/profile', async (req, res) => {
         const user = await User.findOneAndUpdate(
             { localId },
             { $set: update, $setOnInsert: { localId } },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         res.json({ ok: true, id: user._id });
@@ -157,7 +157,7 @@ router.put('/profile', requireAuth, async (req, res) => {
             update['stats.currentGames'] = update.games.length;
         }
 
-        const user = await User.findByIdAndUpdate(req.user._id, update, { new: true });
+        const user = await User.findByIdAndUpdate(req.user._id, update, { returnDocument: 'after' });
         res.json({ ok: true, profile: user });
     } catch (e) {
         res.status(500).json({ ok: false, error: 'Erreur serveur' });

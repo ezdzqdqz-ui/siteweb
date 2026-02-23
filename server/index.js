@@ -49,6 +49,14 @@ async function connectMongo() {
         });
         mongoConnected = true;
         console.log('✅ MongoDB connecté');
+
+        // Drop old unique index on discordId (allows null for local users)
+        try {
+            await mongoose.connection.collection('users').dropIndex('discordId_1');
+            console.log('✅ Ancien index discordId_1 supprimé');
+        } catch (e) {
+            // Index doesn't exist or already dropped — fine
+        }
     } catch (err) {
         mongoConnected = false;
         console.log('⚠️  MongoDB non disponible:', err.message);
