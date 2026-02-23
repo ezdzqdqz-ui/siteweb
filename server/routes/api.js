@@ -4,6 +4,7 @@
 const router = require('express').Router();
 const crypto = require('crypto');
 const User = require('../models/User');
+const Message = require('../models/Message');
 
 // ---- Middleware: vérifier auth ----
 function requireAuth(req, res, next) {
@@ -267,6 +268,173 @@ router.get('/contacts', requireAuth, async (req, res) => {
     try {
         const user = await User.findById(req.user._id).populate('contacts', 'username avatar discordId tagline status stats');
         res.json({ ok: true, contacts: user.contacts || [] });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+/* ============================================================
+   SYNC: Contacts (mode local — pas d'auth)
+   ============================================================ */
+
+// ---- Sync: get contacts ----
+router.get('/sync/contacts', async (req, res) => {
+    try {
+        const { localId } = req.query;
+        if (!localId) return res.status(400).json({ ok: false, error: 'localId manquant' });
+        const user = await User.findOne({ localId });
+        if (!user) return res.json({ ok: true, contacts: [] });
+        res.json({ ok: true, contacts: user.contacts || [] });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: add contact ----
+router.post('/sync/contacts', async (req, res) => {
+    try {
+        const { localId, contactLocalId } = req.body;
+        if (!localId || !contactLocalId) return res.status(400).json({ ok: false, error: 'Données manquantes' });
+        await User.findOneAndUpdate({ localId }, { $addToSet: { contacts: contactLocalId } });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: remove contact ----
+router.delete('/sync/contacts', async (req, res) => {
+    try {
+        const { localId, contactLocalId } = req.body;
+        if (!localId || !contactLocalId) return res.status(400).json({ ok: false, error: 'Données manquantes' });
+        await User.findOneAndUpdate({ localId }, { $pull: { contacts: contactLocalId } });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+/* ============================================================
+   SYNC: Messages (mode local — pas d'auth)
+   ============================================================ */
+
+// ---- Sync: send message ----
+router.post('/sync/messages', async (req, res) => {
+    try {
+        const { from, to, text, isInvite, inviteGame } = req.body;
+        if (!from || !to || !text) return res.status(400).json({ ok: false, error: 'Données manquantes' });
+
+        const msg = await Message.create({
+            from, to, text,
+            isInvite: isInvite || false,
+            inviteGame: inviteGame || '',
+            inviteStatus: isInvite ? 'sent' : '',
+        });
+
+        // Auto-add as contacts
+        await User.findOneAndUpdate({ localId: from }, { $addToSet: { contacts: to } });
+        await User.findOneAndUpdate({ localId: to }, { $addToSet: { contacts: from } });
+
+        res.json({ ok: true, message: msg });
+    } catch (e) {
+        console.error('Sync message error:', e.message);
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: get messages with a player ----
+router.get('/sync/messages', async (req, res) => {
+    try {
+        const { localId, with: withId } = req.query;
+        if (!localId || !withId) return res.status(400).json({ ok: false, error: 'Données manquantes' });
+
+        const messages = await Message.find({
+            $or: [
+                { from: localId, to: withId },
+                { from: withId, to: localId },
+            ]
+        }).sort({ createdAt: 1 }).limit(200);
+
+        res.json({ ok: true, messages });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: get all conversations (latest per contact) ----
+router.get('/sync/conversations', async (req, res) => {
+    try {
+        const { localId } = req.query;
+        if (!localId) return res.status(400).json({ ok: false, error: 'localId manquant' });
+
+        // Get all messages involving this user
+        const messages = await Message.find({
+            $or: [{ from: localId }, { to: localId }]
+        }).sort({ createdAt: -1 });
+
+        // Group by conversation partner
+        const convos = {};
+        for (const msg of messages) {
+            const partnerId = msg.from === localId ? msg.to : msg.from;
+            if (!convos[partnerId]) {
+                convos[partnerId] = {
+                    partnerId,
+                    lastMessage: msg.text,
+                    lastTimestamp: msg.createdAt,
+                    unread: 0,
+                    messages: [],
+                };
+            }
+            convos[partnerId].messages.push({
+                id: msg._id,
+                text: msg.text,
+                fromMe: msg.from === localId,
+                timestamp: msg.createdAt,
+                read: msg.read,
+                isInvite: msg.isInvite,
+                inviteGame: msg.inviteGame,
+            });
+            if (!msg.read && msg.to === localId) {
+                convos[partnerId].unread++;
+            }
+        }
+
+        // Reverse messages to chronological order
+        for (const c of Object.values(convos)) {
+            c.messages.reverse();
+        }
+
+        res.json({ ok: true, conversations: convos });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: mark messages as read ----
+router.post('/sync/messages/read', async (req, res) => {
+    try {
+        const { localId, from } = req.body;
+        if (!localId || !from) return res.status(400).json({ ok: false, error: 'Données manquantes' });
+
+        await Message.updateMany(
+            { from, to: localId, read: false },
+            { $set: { read: true } }
+        );
+
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: 'Erreur serveur' });
+    }
+});
+
+// ---- Sync: get total unread count ----
+router.get('/sync/unread', async (req, res) => {
+    try {
+        const { localId } = req.query;
+        if (!localId) return res.status(400).json({ ok: false, error: 'localId manquant' });
+
+        const count = await Message.countDocuments({ to: localId, read: false });
+        res.json({ ok: true, count });
     } catch (e) {
         res.status(500).json({ ok: false, error: 'Erreur serveur' });
     }

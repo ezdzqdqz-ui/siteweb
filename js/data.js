@@ -21,6 +21,8 @@ const TTM = {
                 // Sync current profile to server if logged in
                 if (this.Auth.isLoggedIn()) {
                     await this._syncProfileToServer();
+                    // Load conversations from server
+                    await this._loadServerConversations();
                 }
                 // Load all players from server
                 await this._loadServerPlayers();
@@ -63,6 +65,19 @@ const TTM = {
             const data = await res.json();
             if (data.ok) {
                 this._serverPlayers = data.players.map(p => this._mongoUserToPlayer(p));
+            }
+        } catch (e) { /* silently fail */ }
+    },
+
+    async _loadServerConversations() {
+        if (!this._serverAvailable) return;
+        try {
+            const localId = this.Auth.getCurrentUserId();
+            if (!localId) return;
+            const res = await fetch('/api/sync/conversations?localId=' + encodeURIComponent(localId));
+            const data = await res.json();
+            if (data.ok) {
+                this._serverConversations = data.conversations;
             }
         } catch (e) { /* silently fail */ }
     },
@@ -403,7 +418,7 @@ const TTM = {
     },
 
     // ==========================================================
-    //  CONTACTS
+    //  CONTACTS (synced with server)
     // ==========================================================
     getContacts() {
         const data = localStorage.getItem(this._key('contacts'));
@@ -416,12 +431,30 @@ const TTM = {
             contacts.push(playerId);
             localStorage.setItem(this._key('contacts'), JSON.stringify(contacts));
         }
+        // Sync to server
+        if (this._serverAvailable) {
+            const localId = this.Auth.getCurrentUserId();
+            fetch('/api/sync/contacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ localId, contactLocalId: playerId })
+            }).catch(() => {});
+        }
     },
 
     removeContact(playerId) {
         let contacts = this.getContacts();
         contacts = contacts.filter(c => c !== playerId);
         localStorage.setItem(this._key('contacts'), JSON.stringify(contacts));
+        // Sync to server
+        if (this._serverAvailable) {
+            const localId = this.Auth.getCurrentUserId();
+            fetch('/api/sync/contacts', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ localId, contactLocalId: playerId })
+            }).catch(() => {});
+        }
     },
 
     isContact(playerId) {
@@ -429,20 +462,34 @@ const TTM = {
     },
 
     // ==========================================================
-    //  CHAT
+    //  CHAT (synced with server)
     // ==========================================================
+    _serverConversations: null,
+
     getChats() {
+        // Server data if available
+        if (this._serverConversations) {
+            const chats = {};
+            for (const [partnerId, convo] of Object.entries(this._serverConversations)) {
+                chats[partnerId] = convo.messages || [];
+            }
+            return chats;
+        }
         const data = localStorage.getItem(this._key('chats'));
         return data ? JSON.parse(data) : {};
     },
 
     getChatWith(playerId) {
+        if (this._serverConversations && this._serverConversations[playerId]) {
+            return this._serverConversations[playerId].messages || [];
+        }
         const chats = this.getChats();
         return chats[playerId] || [];
     },
 
     sendMessage(playerId, text, fromMe) {
         if (fromMe === undefined) fromMe = true;
+        // Save locally
         const chats = this.getChats();
         if (!chats[playerId]) chats[playerId] = [];
         chats[playerId].push({
@@ -453,20 +500,39 @@ const TTM = {
             read: fromMe
         });
         localStorage.setItem(this._key('chats'), JSON.stringify(chats));
-
         this.addContact(playerId);
 
-        if (fromMe) {
-            setTimeout(() => this._simulateReply(playerId), 2000 + Math.random() * 4000);
+        // Sync to server
+        if (this._serverAvailable) {
+            const localId = this.Auth.getCurrentUserId();
+            fetch('/api/sync/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    from: localId,
+                    to: playerId,
+                    text: text,
+                })
+            }).catch(() => {});
         }
     },
 
     getUnreadCount(playerId) {
+        if (this._serverConversations && this._serverConversations[playerId]) {
+            return this._serverConversations[playerId].unread || 0;
+        }
         const msgs = this.getChatWith(playerId);
         return msgs.filter(m => !m.fromMe && !m.read).length;
     },
 
     getTotalUnread() {
+        if (this._serverConversations) {
+            let count = 0;
+            for (const convo of Object.values(this._serverConversations)) {
+                count += convo.unread || 0;
+            }
+            return count;
+        }
         const chats = this.getChats();
         let count = 0;
         for (const pid in chats) {
@@ -476,50 +542,29 @@ const TTM = {
     },
 
     markAsRead(playerId) {
+        // Local
         const chats = this.getChats();
         if (chats[playerId]) {
             chats[playerId].forEach(m => { m.read = true; });
             localStorage.setItem(this._key('chats'), JSON.stringify(chats));
         }
-    },
-
-    _simulateReply(playerId) {
-        const player = this.getPlayerById(playerId);
-        const pName = player ? player.name : 'Joueur';
-
-        // Dispatch typing event first
-        window.dispatchEvent(new CustomEvent('ttm-typing', { detail: { playerId, name: pName } }));
-
-        const replies = [
-            "Hey ! Ça me dit grave, on se fait une game ?",
-            "Yo ! Je suis dispo ce soir si tu veux",
-            "Salut, merci pour l'invite ! Je t'ajoute sur Discord",
-            "Ça marche, je suis chaud ! Tu joues à quelle heure ?",
-            "Nice ! On queue ensemble ? Envoie ton Discord",
-            "Yoo merci ! Ajoute-moi : " + pName + "#1337",
-            "Je suis partant, on se retrouve sur le serv ?",
-            "Cool ! Je finis ma game et j'arrive",
-            "GG ! Oui carrément, let's go",
-            "Ah trop bien, je cherchais justement un mate !"
-        ];
-
-        const reply = replies[Math.floor(Math.random() * replies.length)];
-        const chats = this.getChats();
-        if (!chats[playerId]) chats[playerId] = [];
-        chats[playerId].push({
-            id: Date.now(),
-            text: reply,
-            fromMe: false,
-            timestamp: new Date().toISOString(),
-            read: false
-        });
-        localStorage.setItem(this._key('chats'), JSON.stringify(chats));
-
-        window.dispatchEvent(new CustomEvent('ttm-new-message', { detail: { playerId: playerId, text: reply } }));
+        // Server
+        if (this._serverConversations && this._serverConversations[playerId]) {
+            this._serverConversations[playerId].unread = 0;
+            this._serverConversations[playerId].messages.forEach(m => { m.read = true; });
+        }
+        if (this._serverAvailable) {
+            const localId = this.Auth.getCurrentUserId();
+            fetch('/api/sync/messages/read', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ localId, from: playerId })
+            }).catch(() => {});
+        }
     },
 
     // ==========================================================
-    //  INVITES
+    //  INVITES (synced with server via messages)
     // ==========================================================
     getInvites() {
         const data = localStorage.getItem(this._key('invites'));
@@ -539,7 +584,35 @@ const TTM = {
         localStorage.setItem(this._key('invites'), JSON.stringify(invites));
 
         const fullMsg = '[Invitation a jouer — ' + game + '] ' + message;
-        this.sendMessage(playerId, fullMsg, true);
+
+        // Save locally
+        const chats = this.getChats();
+        if (!chats[playerId]) chats[playerId] = [];
+        chats[playerId].push({
+            id: Date.now(),
+            text: fullMsg,
+            fromMe: true,
+            timestamp: new Date().toISOString(),
+            read: true
+        });
+        localStorage.setItem(this._key('chats'), JSON.stringify(chats));
+        this.addContact(playerId);
+
+        // Sync to server
+        if (this._serverAvailable) {
+            const localId = this.Auth.getCurrentUserId();
+            fetch('/api/sync/messages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    from: localId,
+                    to: playerId,
+                    text: fullMsg,
+                    isInvite: true,
+                    inviteGame: game,
+                })
+            }).catch(() => {});
+        }
     },
 
     // ==========================================================
